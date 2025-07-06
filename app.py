@@ -9,7 +9,7 @@ subprocess.run("pip uninstall -y opencv-python opencv-contrib-python opencv-pyth
 subprocess.run("pip install opencv-contrib-python-headless==4.8.1.78", shell=True)
 
 import streamlit as st
-import cv2
+
 import numpy as np
 import torch
 from PIL import Image
@@ -374,6 +374,8 @@ def check_user(username, password):
     return user
 
 def log_violation(reason, frame):
+    import cv2  # 💥 Delay cv2 import here
+
     if not os.path.exists(FRAME_SAVE_DIR):
         os.makedirs(FRAME_SAVE_DIR)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -418,12 +420,14 @@ HELMET_CLASSES = find_helmet_classes()
 # DETECTION & ALERT LOGIC
 # ---------------------------
 def draw_restricted_zone(frame, coords=(100, 100, 500, 400)):
+    import cv2  # 💥 Delay cv2 import here
     x1, y1, x2, y2 = coords
     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
     cv2.putText(frame, "Restricted Zone", (x1, y1 - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
 def detect_and_alert(frame, confidence_thresh):
+    import cv2  # 💥 Delay cv2 import here
     results = model(frame)
     detections = results.pandas().xyxy[0]
     frame = np.squeeze(results.render())
@@ -571,7 +575,7 @@ else:
             if st.session_state.get('webcam_running', False):
                 st.markdown('<div style="background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 20px; margin-top: 20px;">', unsafe_allow_html=True)
                 st.markdown('<h4 style="color: #ffffff; margin-bottom: 15px;">🎥 Live Feed</h4>', unsafe_allow_html=True)
-                
+                import cv2  # 💥 Delay cv2 import
                 cap = cv2.VideoCapture(0)
                 stframe = st.empty()
                 
@@ -629,7 +633,7 @@ else:
                 if st.button("🎬 Process Video", use_container_width=True):
                     st.markdown('<div style="background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 20px; margin-top: 20px;">', unsafe_allow_html=True)
                     st.markdown('<h4 style="color: #ffffff; margin-bottom: 15px;">🎬 Processing Video</h4>', unsafe_allow_html=True)
-                    
+                    import cv2  # 💥 Delay cv2 import
                     cap = cv2.VideoCapture("temp_video.mp4")
                     stframe = st.empty()
                     progress_bar = st.progress(0)
