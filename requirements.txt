@@ -9,3 +9,4 @@ torch
 torchvision
 ultralytics
 seaborn
+streamlit-webrtc
