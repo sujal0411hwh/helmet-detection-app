@@ -11,6 +11,7 @@ from datetime import datetime
 import pandas as pd
 from fpdf import FPDF
 import plotly.express as px
+from io import BytesIO
 
 # ---------------------------
 # CONFIGURATION & STYLING
@@ -520,10 +521,15 @@ else:
         st.markdown('</div>', unsafe_allow_html=True)
 
     # Main content tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["🎥 Live Detection", "📂 Violation Logs", "📊 Analytics", "👥 Admin Panel"])
+    detection_tab, logs_tab, analytics_tab, admin_tab = st.tabs([
+        "🎥 Live Detection",
+        "📂 Violation Logs", 
+        "📊 Analytics",
+        "👥 Admin Panel"
+    ])
 
     # ---- Live Detection ----
-    with tab1:
+    with detection_tab:
         st.markdown('<div class="feature-card">', unsafe_allow_html=True)
         st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">🎥 Live Detection Options</h2>', unsafe_allow_html=True)
         
@@ -638,7 +644,7 @@ else:
             st.markdown('</div>', unsafe_allow_html=True)
 
     # ---- Violation Logs ----
-    with tab2:
+    with logs_tab:
         st.markdown('<div class="analytics-container">', unsafe_allow_html=True)
         st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">📂 Violation Logs</h2>', unsafe_allow_html=True)
         
@@ -646,7 +652,9 @@ else:
         df = pd.read_sql_query("SELECT * FROM violations", conn)
         conn.close()
         
-        if not df.empty:
+        if df.empty:
+            st.info("📭 No violations logged yet. Start detection to log violations.")
+        else:
             # Summary metrics
             col1, col2, col3, col4 = st.columns(4)
             with col1:
@@ -698,26 +706,54 @@ else:
             # Export options
             st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">📥 Export Reports</h3>', unsafe_allow_html=True)
             col1, col2 = st.columns(2)
+            
             with col1:
                 if st.button("⬇️ Download CSV", use_container_width=True):
-                    df.to_csv("violations_report.csv", index=False)
-                    st.success("✅ CSV exported as violations_report.csv")
+                    # Convert dataframe to CSV string
+                    csv_data = df.to_csv(index=False).encode('utf-8')
+                    # Provide download button
+                    st.download_button(
+                        label="📥 Download CSV Report",
+                        data=csv_data,
+                        file_name='violations_report.csv',
+                        mime='text/csv',
+                        use_container_width=True
+                    )
+                    st.success("✅ CSV exported successfully!")
             
             with col2:
                 if st.button("⬇️ Download PDF", use_container_width=True):
                     pdf = FPDF()
                     pdf.add_page()
                     pdf.set_font("Arial", size=12)
+                    # Header with center alignment
+                    pdf.cell(200, 10, txt="Violation Report", ln=True, align='C')
                     for idx, row in df.iterrows():
-                        pdf.cell(200, 10, text=f"{row['timestamp']} - {row['reason']}", ln=True)
-                    pdf.output("violations_report.pdf")
-                    st.success("✅ PDF exported as violations_report.pdf")
-        else:
-            st.info("📭 No violations logged yet. Start detection to log violations.")
-        st.markdown('</div>', unsafe_allow_html=True)
+                        # Content with left alignment
+                        pdf.cell(200, 10, txt=f"{row['timestamp']} - {row['reason']}", ln=True)
+
+                    # Save to a temporary file first
+                    temp_pdf_path = "temp_report.pdf"
+                    pdf.output(temp_pdf_path)
+                    
+                    # Read the file and provide it for download
+                    with open(temp_pdf_path, "rb") as pdf_file:
+                        pdf_data = pdf_file.read()
+                    
+                    # Clean up the temporary file
+                    os.remove(temp_pdf_path)
+                    
+                    # Provide download button
+                    st.download_button(
+                        label="📥 Download PDF Report",
+                        data=pdf_data,
+                        file_name="violations_report.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
 
     # ---- Analytics ----
-    with tab3:
+    with analytics_tab:
         st.markdown('<div class="analytics-container">', unsafe_allow_html=True)
         st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">📊 Violation Analytics</h2>', unsafe_allow_html=True)
         
@@ -784,7 +820,7 @@ else:
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ---- Admin Panel ----
-    with tab4:
+    with admin_tab:
         st.markdown('<div class="analytics-container">', unsafe_allow_html=True)
         st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">👥 Admin Panel</h2>', unsafe_allow_html=True)
         
