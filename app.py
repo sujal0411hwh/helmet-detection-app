@@ -542,120 +542,104 @@ else:
         "👥 Admin Panel"
     ])
 
-    # ---- Live Detection ----
-    with detection_tab:
-        st.markdown('<div class="feature-card">', unsafe_allow_html=True)
-        st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">🎥 Live Detection Options</h2>', unsafe_allow_html=True)
-        
-        detect_mode = st.radio(
-            "Select Detection Mode:",
-            ["📡 Webcam", "📸 Image Upload", "🎥 Video Upload"],
-            horizontal=True
+   # ---- Live Detection ----
+with detection_tab:
+    st.markdown('<div class="feature-card">', unsafe_allow_html=True)
+    st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">🎥 Live Detection Options</h2>', unsafe_allow_html=True)
+    
+    detect_mode = st.radio(
+        "Select Detection Mode:",
+        ["📡 Webcam", "📸 Image Upload", "🎥 Video Upload"],
+        horizontal=True
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    if detect_mode == "📡 Webcam":
+        st.markdown('<div class="webcam-container">', unsafe_allow_html=True)
+        st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">📡 Real-time Webcam Detection</h3>', unsafe_allow_html=True)
+
+        from streamlit_webrtc import webrtc_streamer
+        import av  # Required for streamlit-webrtc
+
+        def video_frame_callback(frame):
+            img = frame.to_ndarray(format="bgr24")
+            processed_img, alert = detect_and_alert(img, confidence_thresh)
+            if alert:
+                st.warning("🚨 Violation Detected!")
+            return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
+
+        webrtc_streamer(
+            key="helmet-detection",
+            video_frame_callback=video_frame_callback,
+            media_stream_constraints={"video": True, "audio": False},
+            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         )
+
         st.markdown('</div>', unsafe_allow_html=True)
 
-        if detect_mode == "📡 Webcam":
-            st.markdown('<div class="webcam-container">', unsafe_allow_html=True)
-            st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">📡 Real-time Webcam Detection</h3>', unsafe_allow_html=True)
+    elif detect_mode == "📸 Image Upload":
+        st.markdown('<div class="upload-container">', unsafe_allow_html=True)
+        st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">📸 Image Analysis</h3>', unsafe_allow_html=True)
+        
+        img_file = st.file_uploader("Choose Image", type=['jpg', 'png', 'jpeg'], help="Upload an image to analyze for helmet violations")
+        
+        if img_file is not None:
+            img = Image.open(img_file)
+            img_array = np.array(img)
             
-            col1, col2, col3 = st.columns([1, 1, 1])
+            col1, col2 = st.columns(2)
             with col1:
-                if st.button("📷 Start Webcam", use_container_width=True):
-                    st.session_state['webcam_running'] = True
-            with col2:
-                if st.button("🛑 Stop Webcam", use_container_width=True):
-                    st.session_state['webcam_running'] = False
-            with col3:
-                if st.button("🔄 Reset", use_container_width=True):
-                    st.session_state['webcam_running'] = False
-                    st.rerun()
+                st.markdown('<h4 style="color: #ffffff; margin-bottom: 10px;">📸 Original Image</h4>', unsafe_allow_html=True)
+                st.image(img, caption="Uploaded Image", use_container_width=True)
             
-            st.markdown('</div>', unsafe_allow_html=True)
+            with col2:
+                st.markdown('<h4 style="color: #ffffff; margin-bottom: 10px;">🔍 Detection Result</h4>', unsafe_allow_html=True)
+                if st.button("🔍 Analyze Image", use_container_width=True):
+                    processed_img, alert = detect_and_alert(img_array, confidence_thresh)
+                    st.image(processed_img, caption="Detection Result", use_container_width=True)
+                    if alert:
+                        st.warning("🚨 Violation Detected!")
+                    else:
+                        st.success("✅ No violations detected!")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            if st.session_state.get('webcam_running', False):
+    elif detect_mode == "🎥 Video Upload":
+        st.markdown('<div class="upload-container">', unsafe_allow_html=True)
+        st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">🎥 Video Analysis</h3>', unsafe_allow_html=True)
+        
+        vid_file = st.file_uploader("Choose Video", type=['mp4', 'avi', 'mov'], help="Upload a video to analyze for helmet violations")
+        
+        if vid_file is not None:
+            tfile = open("temp_video.mp4", 'wb')
+            tfile.write(vid_file.read())
+            tfile.close()
+            
+            if st.button("🎬 Process Video", use_container_width=True):
                 st.markdown('<div style="background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 20px; margin-top: 20px;">', unsafe_allow_html=True)
-                st.markdown('<h4 style="color: #ffffff; margin-bottom: 15px;">🎥 Live Feed</h4>', unsafe_allow_html=True)
+                st.markdown('<h4 style="color: #ffffff; margin-bottom: 15px;">🎬 Processing Video</h4>', unsafe_allow_html=True)
                 import cv2  # 💥 Delay cv2 import
-                cap = cv2.VideoCapture(0)
+                cap = cv2.VideoCapture("temp_video.mp4")
                 stframe = st.empty()
+                progress_bar = st.progress(0)
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                count = 0
                 
-                while st.session_state['webcam_running']:
+                while cap.isOpened():
                     ret, frame = cap.read()
                     if not ret:
-                        st.error("❌ Webcam not available.")
                         break
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     processed_frame, alert = detect_and_alert(frame, confidence_thresh)
                     stframe.image(processed_frame, channels="RGB", use_container_width=True)
                     if alert:
                         st.warning("🚨 Violation Detected!")
-                    time.sleep(0.1)
+                    count += 1
+                    progress_bar.progress(count / total_frames)
+                
                 cap.release()
+                st.success("✅ Video Processing Complete!")
                 st.markdown('</div>', unsafe_allow_html=True)
-
-        elif detect_mode == "📸 Image Upload":
-            st.markdown('<div class="upload-container">', unsafe_allow_html=True)
-            st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">📸 Image Analysis</h3>', unsafe_allow_html=True)
-            
-            img_file = st.file_uploader("Choose Image", type=['jpg', 'png', 'jpeg'], help="Upload an image to analyze for helmet violations")
-            
-            if img_file is not None:
-                img = Image.open(img_file)
-                img_array = np.array(img)
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown('<h4 style="color: #ffffff; margin-bottom: 10px;">📸 Original Image</h4>', unsafe_allow_html=True)
-                    st.image(img, caption="Uploaded Image", use_container_width=True)
-                
-                with col2:
-                    st.markdown('<h4 style="color: #ffffff; margin-bottom: 10px;">🔍 Detection Result</h4>', unsafe_allow_html=True)
-                    if st.button("🔍 Analyze Image", use_container_width=True):
-                        processed_img, alert = detect_and_alert(img_array, confidence_thresh)
-                        st.image(processed_img, caption="Detection Result", use_container_width=True)
-                        if alert:
-                            st.warning("🚨 Violation Detected!")
-                        else:
-                            st.success("✅ No violations detected!")
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        elif detect_mode == "🎥 Video Upload":
-            st.markdown('<div class="upload-container">', unsafe_allow_html=True)
-            st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">🎥 Video Analysis</h3>', unsafe_allow_html=True)
-            
-            vid_file = st.file_uploader("Choose Video", type=['mp4', 'avi', 'mov'], help="Upload a video to analyze for helmet violations")
-            
-            if vid_file is not None:
-                tfile = open("temp_video.mp4", 'wb')
-                tfile.write(vid_file.read())
-                tfile.close()
-                
-                if st.button("🎬 Process Video", use_container_width=True):
-                    st.markdown('<div style="background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 20px; margin-top: 20px;">', unsafe_allow_html=True)
-                    st.markdown('<h4 style="color: #ffffff; margin-bottom: 15px;">🎬 Processing Video</h4>', unsafe_allow_html=True)
-                    import cv2  # 💥 Delay cv2 import
-                    cap = cv2.VideoCapture("temp_video.mp4")
-                    stframe = st.empty()
-                    progress_bar = st.progress(0)
-                    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                    count = 0
-                    
-                    while cap.isOpened():
-                        ret, frame = cap.read()
-                        if not ret:
-                            break
-                        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        processed_frame, alert = detect_and_alert(frame, confidence_thresh)
-                        stframe.image(processed_frame, channels="RGB", use_container_width=True)
-                        if alert:
-                            st.warning("🚨 Violation Detected!")
-                        count += 1
-                        progress_bar.progress(count / total_frames)
-                    
-                    cap.release()
-                    st.success("✅ Video Processing Complete!")
-                    st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # ---- Violation Logs ----
     with logs_tab:
@@ -884,7 +868,6 @@ else:
         st.markdown('</div>', unsafe_allow_html=True)
 
 init_db()
-
 
 
 
