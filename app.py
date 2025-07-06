@@ -1,6 +1,13 @@
 
 import os
-os.environ["OPENCV_VIDEOIO_PRIORITY_MSMF"] = "0"
+import subprocess
+
+# 💣 Delete ALL OpenCV variants from the Streamlit Cloud container
+subprocess.run("pip uninstall -y opencv-python opencv-contrib-python opencv-python-headless opencv-contrib-python-headless", shell=True)
+
+# ✅ Install only the headless contrib version
+subprocess.run("pip install opencv-contrib-python-headless==4.8.1.78", shell=True)
+
 import streamlit as st
 import cv2
 import numpy as np
