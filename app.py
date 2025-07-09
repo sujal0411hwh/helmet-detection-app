@@ -310,51 +310,80 @@ st.markdown("""
 
 
 # Database configuration
-DB_NAME = 'violations.db'
-FRAME_SAVE_DIR = 'violations'
+import os.path
+import tempfile
+
+# Initialize storage paths in session state
+if 'storage_initialized' not in st.session_state:
+    # Create unique subdirectories for this session
+    session_id = str(hash(datetime.now().isoformat()))
+    base_dir = tempfile.gettempdir()
+    
+    st.session_state.temp_dir = os.path.join(base_dir, f"helmet_detection_{session_id}")
+    st.session_state.db_name = os.path.join(st.session_state.temp_dir, 'violations.db')
+    st.session_state.frame_dir = os.path.join(st.session_state.temp_dir, 'violations')
+    
+    # Create necessary directories
+    os.makedirs(st.session_state.temp_dir, exist_ok=True)
+    os.makedirs(st.session_state.frame_dir, exist_ok=True)
+    
+    st.session_state.storage_initialized = True
+
+# Use session state variables
+DB_NAME = st.session_state.db_name
+FRAME_SAVE_DIR = st.session_state.frame_dir
 HELMET_KEYWORDS = ['helmet', 'hardhat', 'headgear', 'safety_hat']
 
 def init_db():
     """Initialize SQLite database with required tables and default admin user"""
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    
-    # Create users table if not exists
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL
-        )
-    ''')
-    
-    # Create violations table if not exists
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS violations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            reason TEXT NOT NULL,
-            frame_path TEXT NOT NULL
-        )
-    ''')
-    
-    # Add default admin user if not exists
     try:
-        default_username = "admin"
-        default_password = "admin123"
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(DB_NAME), exist_ok=True)
         
-        # Check if admin user exists
-        c.execute("SELECT username FROM users WHERE username = ?", (default_username,))
-        if not c.fetchone():
-            # Insert new admin user
-            c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                     (default_username, hash_password(default_password)))
-            st.success(f"Default admin account created! Username: {default_username}, Password: {default_password}")
-    except sqlite3.IntegrityError:
-        pass  # Admin user already exists
-    
-    conn.commit()
-    conn.close()
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        
+        # Create users table if not exists
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL
+            )
+        ''')
+        
+        # Create violations table if not exists
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS violations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                frame_path TEXT NOT NULL
+            )
+        ''')
+        
+        # Add default admin user if not exists
+        try:
+            default_username = "admin"
+            default_password = "admin123"
+            
+            # Check if admin user exists
+            c.execute("SELECT username FROM users WHERE username = ?", (default_username,))
+            if not c.fetchone():
+                # Insert new admin user
+                c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                         (default_username, hash_password(default_password)))
+                st.success(f"Default admin account created! Username: {default_username}, Password: {default_password}")
+        except sqlite3.IntegrityError:
+            pass  # Admin user already exists
+        except Exception as e:
+            st.error(f"Error creating default admin: {str(e)}")
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Database initialization error: {str(e)}")
+        raise e
 
 def hash_password(password):
     """Hash a password using SHA-256"""
