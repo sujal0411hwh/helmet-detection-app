@@ -19,8 +19,8 @@ import av
 # CONFIGURATION & STYLING
 # ---------------------------
 st.set_page_config(
-    page_title="AI Helmet Detection",
-    page_icon="🪖",
+    page_title="AI-Powered Safety Gear Detection for Industrial Monitoring",
+ 
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -604,7 +604,9 @@ if 'logged_in' not in st.session_state:
 if not st.session_state.logged_in:
     st.markdown("""
     <div style="text-align: center; padding: 40px 0;">
-        <h1 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 3rem; font-weight: 700; margin-bottom: 10px;">🪖 AI Helmet Detection</h1>
+        <h1 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 3rem; font-weight: 700; margin-bottom: 10px;">AI-Powered Safety Gear Detection for Industrial Monitoring
+
+</h1>
         <p style="color: #b0b0b0; font-size: 1.2rem; margin-bottom: 40px;">Advanced Safety Monitoring System</p>
     </div>
     """, unsafe_allow_html=True)
@@ -1003,6 +1005,8 @@ else:
                 os.system(f"open {FRAME_SAVE_DIR}")
                 st.success("Opened violations folder!")
         st.markdown('</div>', unsafe_allow_html=True)
+
+#pull 
 
 
 
