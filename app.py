@@ -305,115 +305,56 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Update the main title with better styling
-st.markdown("""
-<div style="text-align: center; padding: 3rem 0;">
-    <h1 style="background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-               -webkit-background-clip: text;
-               -webkit-text-fill-color: transparent;
-               background-clip: text;
-               font-size: 3.5rem;
-               font-weight: 700;
-               margin-bottom: 1.5rem;
-               letter-spacing: 1px;">
-        AI Safety Gear Detection
-    </h1>
-    <p style="color: #b0b0b0;
-              font-size: 1.4rem;
-              margin-bottom: 2rem;
-              max-width: 800px;
-              margin-left: auto;
-              margin-right: auto;
-              line-height: 1.6;">
-        Advanced Safety Monitoring System with Real-time Detection
-    </p>
-</div>
-""", unsafe_allow_html=True)
 
-# Update the dashboard title
-st.markdown("""
-<div style="text-align: center; padding: 20px 0;">
-    <h1 style="background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 2.5rem; font-weight: 700; margin-bottom: 10px;">Safety Gear Detection Dashboard</h1>
-    <p style="color: #b0b0b0; font-size: 1.1rem;">Advanced Safety Monitoring & Analytics</p>
-</div>
-""", unsafe_allow_html=True)
+
+
 
 # Database configuration
-import os.path
-import tempfile
-
-# Initialize storage paths in session state
-if 'storage_initialized' not in st.session_state:
-    # Create unique subdirectories for this session
-    session_id = str(hash(datetime.now().isoformat()))
-    base_dir = tempfile.gettempdir()
-    
-    st.session_state.temp_dir = os.path.join(base_dir, f"helmet_detection_{session_id}")
-    st.session_state.db_name = os.path.join(st.session_state.temp_dir, 'violations.db')
-    st.session_state.frame_dir = os.path.join(st.session_state.temp_dir, 'violations')
-    
-    # Create necessary directories
-    os.makedirs(st.session_state.temp_dir, exist_ok=True)
-    os.makedirs(st.session_state.frame_dir, exist_ok=True)
-    
-    st.session_state.storage_initialized = True
-
-# Use session state variables
-TEMP_DIR = st.session_state.temp_dir
-DB_NAME = st.session_state.db_name
-FRAME_SAVE_DIR = st.session_state.frame_dir
+DB_NAME = 'violations.db'
+FRAME_SAVE_DIR = 'violations'
 HELMET_KEYWORDS = ['helmet', 'hardhat', 'headgear', 'safety_hat']
 
 def init_db():
     """Initialize SQLite database with required tables and default admin user"""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    
+    # Create users table if not exists
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL
+        )
+    ''')
+    
+    # Create violations table if not exists
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS violations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            frame_path TEXT NOT NULL
+        )
+    ''')
+    
+    # Add default admin user if not exists
     try:
-        # Ensure the directory exists
-        os.makedirs(os.path.dirname(DB_NAME), exist_ok=True)
+        default_username = "admin"
+        default_password = "admin123"
         
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        
-        # Create users table if not exists
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL
-            )
-        ''')
-        
-        # Create violations table if not exists
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS violations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL,
-                reason TEXT NOT NULL,
-                frame_path TEXT NOT NULL
-            )
-        ''')
-        
-        # Add default admin user if not exists
-        try:
-            default_username = "admin"
-            default_password = "admin123"
-            
-            # Check if admin user exists
-            c.execute("SELECT username FROM users WHERE username = ?", (default_username,))
-            if not c.fetchone():
-                # Insert new admin user
-                c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                         (default_username, hash_password(default_password)))
-                st.success(f"Default admin account created! Username: {default_username}, Password: {default_password}")
-        except sqlite3.IntegrityError:
-            pass  # Admin user already exists
-        except Exception as e:
-            st.error(f"Error creating default admin: {str(e)}")
-        
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        st.error(f"Database initialization error: {str(e)}")
-        raise e
+        # Check if admin user exists
+        c.execute("SELECT username FROM users WHERE username = ?", (default_username,))
+        if not c.fetchone():
+            # Insert new admin user
+            c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                     (default_username, hash_password(default_password)))
+            st.success(f"Default admin account created! Username: {default_username}, Password: {default_password}")
+    except sqlite3.IntegrityError:
+        pass  # Admin user already exists
+    
+    conn.commit()
+    conn.close()
 
 def hash_password(password):
     """Hash a password using SHA-256"""
@@ -444,62 +385,52 @@ def add_user(username, password):
         st.error(f"❌ {message}")
         return False
     
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
     try:
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
         c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)",
                  (username, hash_password(password)))
         conn.commit()
-        conn.close()
         st.success("Account created successfully!")
         st.info("You can now log in with your credentials")
         return True
     except sqlite3.IntegrityError:
         st.error("Username already exists!")
         return False
-    except Exception as e:
-        st.error(f"Error creating user: {str(e)}")
-        return False
+    finally:
+        conn.close()
 
 def check_user(username, password):
     """Verify user credentials"""
-    try:
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        c.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
-        result = c.fetchone()
-        conn.close()
-        
-        if result and result[0] == hash_password(password):
-            return True
-        return False
-    except Exception as e:
-        st.error(f"Error checking user credentials: {str(e)}")
-        return False
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
+    result = c.fetchone()
+    conn.close()
+    
+    if result and result[0] == hash_password(password):
+        return True
+    return False
 
 def log_violation(reason, frame):
     """Log a violation with timestamp and save the frame"""
-    try:
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        
-        # Create violations directory if it doesn't exist
-        os.makedirs(FRAME_SAVE_DIR, exist_ok=True)
-        
-        # Save the frame
-        frame_path = os.path.join(FRAME_SAVE_DIR, f"{timestamp}.jpg")
-        cv2.imwrite(frame_path, frame)
-        
-        # Log to database
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        c.execute("INSERT INTO violations (timestamp, reason, frame_path) VALUES (?, ?, ?)",
-                 (timestamp, reason, frame_path))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        st.error(f"Error logging violation: {str(e)}")
-        # Continue execution even if logging fails
-        pass
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    # Create violations directory if it doesn't exist
+    if not os.path.exists(FRAME_SAVE_DIR):
+        os.makedirs(FRAME_SAVE_DIR)
+    
+    # Save the frame
+    frame_path = os.path.join(FRAME_SAVE_DIR, f"{timestamp}.jpg")
+    cv2.imwrite(frame_path, frame)
+    
+    # Log to database
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("INSERT INTO violations (timestamp, reason, frame_path) VALUES (?, ?, ?)",
+             (timestamp, reason, frame_path))
+    conn.commit()
+    conn.close()
 
 # Initialize database at startup
 init_db()
@@ -566,42 +497,6 @@ def create_chart_config():
     }
 
 # ---------------------------
-# MODEL CONFIGURATION
-# ---------------------------
-def download_default_model(dest_path):
-    """Download the default YOLOv8n model"""
-    try:
-        import requests
-        # URL for the YOLOv8n model
-        model_url = "https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt"
-        
-        st.info("Downloading default YOLOv8 model... This may take a few minutes.")
-        response = requests.get(model_url, stream=True)
-        response.raise_for_status()
-        
-        # Get total file size
-        total_size = int(response.headers.get('content-length', 0))
-        
-        # Download with progress updates
-        progress_bar = st.progress(0)
-        with open(dest_path, 'wb') as f:
-            downloaded = 0
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if total_size:
-                        progress = int((downloaded / total_size) * 100)
-                        progress_bar.progress(progress / 100)
-        
-        progress_bar.empty()
-        st.success("✅ Default model downloaded successfully!")
-        return True
-    except Exception as e:
-        st.error(f"Error downloading default model: {str(e)}")
-        return False
-
-# ---------------------------
 # LOAD MODEL
 # ---------------------------
 @st.cache_resource
@@ -614,11 +509,7 @@ def load_model():
         st.error(f"❌ Error loading model: {e}")
         raise e
 
-try:
-    model = load_model()
-except Exception as e:
-    st.error("❌ Could not load the model. Please ensure 'bestnew.pt' is in the same directory as app.py")
-    st.stop()  # Stop the app if model loading fails
+model = load_model()
 
 # ---------------------------
 # HELMET CLASS DETECTION
@@ -889,13 +780,9 @@ else:
         st.markdown('<div class="analytics-container">', unsafe_allow_html=True)
         st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">📂 Violation Logs</h2>', unsafe_allow_html=True)
         
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            df = pd.read_sql_query("SELECT * FROM violations", conn)
-            conn.close()
-        except Exception as e:
-            st.error(f"Error loading violation logs: {str(e)}")
-            df = pd.DataFrame()  # Empty DataFrame as fallback
+        conn = sqlite3.connect(DB_NAME)
+        df = pd.read_sql_query("SELECT * FROM violations", conn)
+        conn.close()
         
         if df.empty:
             st.info("No violations logged yet. Start detection to log violations.")
@@ -986,13 +873,9 @@ else:
         st.markdown('<div class="analytics-container">', unsafe_allow_html=True)
         st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">Violation Analytics</h2>', unsafe_allow_html=True)
         
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            df = pd.read_sql_query("SELECT * FROM violations", conn)
-            conn.close()
-        except Exception as e:
-            st.error(f"Error loading analytics data: {str(e)}")
-            df = pd.DataFrame()  # Empty DataFrame as fallback
+        conn = sqlite3.connect(DB_NAME)
+        df = pd.read_sql_query("SELECT * FROM violations", conn)
+        conn.close()
         
         if not df.empty:
             df['timestamp'] = pd.to_datetime(df['timestamp'], format="%Y-%m-%d_%H-%M-%S", errors='coerce')
@@ -1054,13 +937,9 @@ else:
     with admin_tab:
         st.markdown('<div class="analytics-container">', unsafe_allow_html=True)
         st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">👥 Admin Panel</h2>', unsafe_allow_html=True)
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            admins = pd.read_sql_query("SELECT id, username FROM users", conn)
-            conn.close()
-        except Exception as e:
-            st.error(f"Error loading admin data: {str(e)}")
-            admins = pd.DataFrame()  # Empty DataFrame as fallback
+        conn = sqlite3.connect(DB_NAME)
+        admins = pd.read_sql_query("SELECT id, username FROM users", conn)
+        conn.close()
         st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">👤 Registered Administrators</h3>', unsafe_allow_html=True)
         st.dataframe(admins, use_container_width=True)
         st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">🔧 System Information</h3>', unsafe_allow_html=True)
@@ -1083,19 +962,32 @@ else:
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Clear Violation Logs", use_container_width=True):
-                try:
-                    conn = sqlite3.connect(DB_NAME)
-                    c = conn.cursor()
-                    c.execute("DELETE FROM violations")
-                    conn.commit()
-                    conn.close()
-                    st.success("Violation logs cleared!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error clearing violation logs: {str(e)}")
+                conn = sqlite3.connect(DB_NAME)
+                c = conn.cursor()
+                c.execute("DELETE FROM violations")
+                conn.commit()
+                conn.close()
+                st.success("Violation logs cleared!")
+                st.rerun()
         with col2:
             if st.button("Open Violations Folder", use_container_width=True):
                 os.system(f"open {FRAME_SAVE_DIR}")
                 st.success("Opened violations folder!")
         st.markdown('</div>', unsafe_allow_html=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
