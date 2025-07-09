@@ -340,13 +340,28 @@ st.markdown("""
 
 # Database configuration
 import os.path
+import tempfile
 
-# Get Streamlit's temp directory for storage
-TEMP_DIR = os.path.join(st.runtime.get_instance().get_temp_dir(), "helmet_detection")
-os.makedirs(TEMP_DIR, exist_ok=True)
+# Initialize storage paths in session state
+if 'storage_initialized' not in st.session_state:
+    # Create unique subdirectories for this session
+    session_id = str(hash(datetime.now().isoformat()))
+    base_dir = tempfile.gettempdir()
+    
+    st.session_state.temp_dir = os.path.join(base_dir, f"helmet_detection_{session_id}")
+    st.session_state.db_name = os.path.join(st.session_state.temp_dir, 'violations.db')
+    st.session_state.frame_dir = os.path.join(st.session_state.temp_dir, 'violations')
+    
+    # Create necessary directories
+    os.makedirs(st.session_state.temp_dir, exist_ok=True)
+    os.makedirs(st.session_state.frame_dir, exist_ok=True)
+    
+    st.session_state.storage_initialized = True
 
-DB_NAME = os.path.join(TEMP_DIR, 'violations.db')
-FRAME_SAVE_DIR = os.path.join(TEMP_DIR, 'violations')
+# Use session state variables
+TEMP_DIR = st.session_state.temp_dir
+DB_NAME = st.session_state.db_name
+FRAME_SAVE_DIR = st.session_state.frame_dir
 HELMET_KEYWORDS = ['helmet', 'hardhat', 'headgear', 'safety_hat']
 
 def init_db():
