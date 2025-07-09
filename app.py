@@ -566,23 +566,24 @@ def create_chart_config():
     }
 
 # ---------------------------
-# LOAD MODEL
+# MODEL CONFIGURATION
 # ---------------------------
-def download_file_from_url(url, dest_path):
-    """Download a file from a URL to a destination path"""
+def download_default_model(dest_path):
+    """Download the default YOLOv8n model"""
     try:
         import requests
-        response = requests.get(url, stream=True)
-        response.raise_for_status()  # Raise an exception for bad status codes
+        # URL for the YOLOv8n model
+        model_url = "https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt"
+        
+        st.info("Downloading default YOLOv8 model... This may take a few minutes.")
+        response = requests.get(model_url, stream=True)
+        response.raise_for_status()
         
         # Get total file size
         total_size = int(response.headers.get('content-length', 0))
         
-        # Show download progress
-        progress_text = "Downloading model file..."
-        progress_bar = st.progress(0)
-        
         # Download with progress updates
+        progress_bar = st.progress(0)
         with open(dest_path, 'wb') as f:
             downloaded = 0
             for chunk in response.iter_content(chunk_size=8192):
@@ -590,55 +591,33 @@ def download_file_from_url(url, dest_path):
                     f.write(chunk)
                     downloaded += len(chunk)
                     if total_size:
-                        # Update progress bar
                         progress = int((downloaded / total_size) * 100)
                         progress_bar.progress(progress / 100)
         
         progress_bar.empty()
+        st.success("✅ Default model downloaded successfully!")
         return True
     except Exception as e:
-        st.error(f"Error downloading file: {str(e)}")
+        st.error(f"Error downloading default model: {str(e)}")
         return False
 
+# ---------------------------
+# LOAD MODEL
+# ---------------------------
 @st.cache_resource
 def load_model():
-    """Load or download YOLOv8 model"""
     try:
-        # Define model paths
-        model_filename = 'yolov8n.pt'
-        model_path = os.path.join(TEMP_DIR, model_filename)
-        
-        # Check if model exists in temp directory
-        if not os.path.exists(model_path):
-            st.info("Downloading YOLOv8 model... This may take a few minutes.")
-            
-            # URL for the YOLOv8n model
-            model_url = "https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt"
-            
-            # Download the model
-            if not download_file_from_url(model_url, model_path):
-                raise Exception("Failed to download model file")
-            
-            st.success("✅ Model downloaded successfully!")
-        
-        # Load the model
-        return ModelWrapper(model_path)
-        
+        if os.path.exists('bestnew.pt'):
+            return ModelWrapper('bestnew.pt')
+        raise FileNotFoundError("YOLOv8 model file not found")
     except Exception as e:
-        st.error(f"❌ Error loading model: {str(e)}")
+        st.error(f"❌ Error loading model: {e}")
         raise e
-
-# Add requests to requirements
-if 'requests' not in st.session_state:
-    with open('requirements.txt', 'a') as f:
-        f.write('\nrequests==2.31.0  # Required for model download\n')
-    st.session_state.requests = True
 
 try:
     model = load_model()
-    st.success("✅ Model loaded successfully!")
 except Exception as e:
-    st.error("❌ Could not load the model. Please check your internet connection and try again.")
+    st.error("❌ Could not load the model. Please ensure 'bestnew.pt' is in the same directory as app.py")
     st.stop()  # Stop the app if model loading fails
 
 # ---------------------------
@@ -1119,18 +1098,4 @@ else:
                 os.system(f"open {FRAME_SAVE_DIR}")
                 st.success("Opened violations folder!")
         st.markdown('</div>', unsafe_allow_html=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
