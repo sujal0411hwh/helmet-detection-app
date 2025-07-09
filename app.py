@@ -1,26 +1,19 @@
 import os
-import subprocess
-
-# 💣 Delete ALL OpenCV variants from the Streamlit Cloud container
-subprocess.run("pip uninstall -y opencv-python opencv-contrib-python opencv-python-headless opencv-contrib-python-headless", shell=True)
-
-# ✅ Install only the headless contrib version
-subprocess.run("pip install opencv-contrib-python-headless==4.8.1.78", shell=True)
-
 import streamlit as st
-
 import numpy as np
-import torch
+from ultralytics import YOLO
 from PIL import Image
+import cv2
 import time
 import sqlite3
 import hashlib
-import os
 from datetime import datetime
 import pandas as pd
 from fpdf import FPDF
 import plotly.express as px
 from io import BytesIO
+from streamlit_webrtc import webrtc_streamer
+import av
 
 # ---------------------------
 # CONFIGURATION & STYLING
@@ -312,91 +305,208 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
+
+
+
+# Database configuration
 DB_NAME = 'violations.db'
 FRAME_SAVE_DIR = 'violations'
 HELMET_KEYWORDS = ['helmet', 'hardhat', 'headgear', 'safety_hat']
 
-# ---------------------------
-# DB SETUP
-# ---------------------------
 def init_db():
+    """Initialize SQLite database with required tables and default admin user"""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 username TEXT UNIQUE NOT NULL,
-                 password TEXT NOT NULL)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS violations (
-                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 timestamp TEXT,
-                 reason TEXT,
-                 frame_path TEXT)''')
+    
+    # Create users table if not exists
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL
+        )
+    ''')
+    
+    # Create violations table if not exists
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS violations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            frame_path TEXT NOT NULL
+        )
+    ''')
+    
+    # Add default admin user if not exists
     try:
-        c.execute("ALTER TABLE violations ADD COLUMN frame_path TEXT")
-    except sqlite3.OperationalError:
-        pass  # already exists
-    
-    # Check if any users exist
-    c.execute("SELECT COUNT(*) FROM users")
-    user_count = c.fetchone()[0]
-    
-    # Create default admin user if no users exist
-    if user_count == 0:
         default_username = "admin"
-        default_password = "admin123"  # You should change this in production
-        hashed_pw = hashlib.sha256(default_password.encode()).hexdigest()
-        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", 
-                 (default_username, hashed_pw))
-        print("Created default admin user - Username: admin, Password: admin123")
+        default_password = "admin123"
+        
+        # Check if admin user exists
+        c.execute("SELECT username FROM users WHERE username = ?", (default_username,))
+        if not c.fetchone():
+            # Insert new admin user
+            c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                     (default_username, hash_password(default_password)))
+            st.success(f"Default admin account created! Username: {default_username}, Password: {default_password}")
+    except sqlite3.IntegrityError:
+        pass  # Admin user already exists
     
     conn.commit()
     conn.close()
 
+def hash_password(password):
+    """Hash a password using SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def validate_password(password):
+    """Validate password meets minimum requirements"""
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    if not any(c.isupper() for c in password):
+        return False, "Password must contain at least one uppercase letter"
+    if not any(c.islower() for c in password):
+        return False, "Password must contain at least one lowercase letter"
+    if not any(c.isdigit() for c in password):
+        return False, "Password must contain at least one number"
+    return True, "Password meets requirements"
+
 def add_user(username, password):
+    """Add a new user to the database with validation"""
+    # Validate username
+    if len(username) < 3:
+        st.error("❌ Username must be at least 3 characters long")
+        return False
+        
+    # Validate password
+    is_valid, message = validate_password(password)
+    if not is_valid:
+        st.error(f"❌ {message}")
+        return False
+    
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    hashed_pw = hashlib.sha256(password.encode()).hexdigest()
     try:
-        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_pw))
+        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                 (username, hash_password(password)))
         conn.commit()
+        st.success("Account created successfully!")
+        st.info("You can now log in with your credentials")
+        return True
     except sqlite3.IntegrityError:
-        st.error("🚨 Username already exists!")
-    conn.close()
+        st.error("Username already exists!")
+        return False
+    finally:
+        conn.close()
 
 def check_user(username, password):
+    """Verify user credentials"""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    hashed_pw = hashlib.sha256(password.encode()).hexdigest()
-    c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, hashed_pw))
-    user = c.fetchone()
+    c.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
+    result = c.fetchone()
     conn.close()
-    return user
+    
+    if result and result[0] == hash_password(password):
+        return True
+    return False
 
 def log_violation(reason, frame):
-    import cv2  # 💥 Delay cv2 import here
-
+    """Log a violation with timestamp and save the frame"""
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    # Create violations directory if it doesn't exist
     if not os.path.exists(FRAME_SAVE_DIR):
         os.makedirs(FRAME_SAVE_DIR)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    # Save the frame
     frame_path = os.path.join(FRAME_SAVE_DIR, f"{timestamp}.jpg")
-    cv2.imwrite(frame_path, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+    cv2.imwrite(frame_path, frame)
+    
+    # Log to database
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("INSERT INTO violations (timestamp, reason, frame_path) VALUES (?, ?, ?)",
-              (timestamp, reason, frame_path))
+             (timestamp, reason, frame_path))
     conn.commit()
     conn.close()
 
+# Initialize database at startup
+init_db()
+
+class ModelWrapper:
+    def __init__(self, model_path):
+        self.model_path = model_path
+        self.model = None
+        self.load_model()
+
+    def load_model(self):
+        """Load YOLOv8 model"""
+        try:
+            self.model = YOLO(self.model_path)
+        except Exception as e:
+            st.error(f"❌ Failed to load model: {str(e)}")
+            raise e
+
+    def get_names(self):
+        """Get class names from the model"""
+        if not self.model:
+            return {}
+        return self.model.names
+
+    def predict(self, frame):
+        """Run prediction and return results in a consistent format"""
+        if not self.model:
+            raise ValueError("Model not loaded properly")
+            
+        results = self.model(frame)
+        # Convert YOLOv8 results to pandas DataFrame for consistency
+        pred_df = pd.DataFrame([
+            {
+                'xmin': box.xyxy[0][0],
+                'ymin': box.xyxy[0][1],
+                'xmax': box.xyxy[0][2],
+                'ymax': box.xyxy[0][3],
+                'confidence': box.conf,
+                'name': self.model.names[int(box.cls)]
+            }
+            for r in results
+            for box in r.boxes
+        ])
+        return pred_df, results[0].plot()  # Return both DataFrame and rendered image
+
+def create_chart_config():
+    return {
+        'layout': {
+            'plot_bgcolor': 'rgba(0,0,0,0)',
+            'paper_bgcolor': 'rgba(0,0,0,0)',
+            'font': {'color': 'white'},
+            'title': {'font': {'color': 'white'}},
+            'xaxis': {
+                'gridcolor': 'rgba(255,255,255,0.1)',
+                'zerolinecolor': 'rgba(255,255,255,0.1)',
+                'tickfont': {'color': 'white'}
+            },
+            'yaxis': {
+                'gridcolor': 'rgba(255,255,255,0.1)',
+                'zerolinecolor': 'rgba(255,255,255,0.1)',
+                'tickfont': {'color': 'white'}
+            }
+        }
+    }
+
 # ---------------------------
-# LOAD YOLOv5 MODEL
+# LOAD MODEL
 # ---------------------------
 @st.cache_resource
 def load_model():
     try:
-        model = torch.hub.load('ultralytics/yolov5', 'custom', path='best.pt', force_reload=True)
-        return model
+        if os.path.exists('bestnew.pt'):
+            return ModelWrapper('bestnew.pt')
+        raise FileNotFoundError("YOLOv8 model file not found")
     except Exception as e:
-        st.error(f"❌ Error loading YOLOv5 model: {e}")
+        st.error(f"❌ Error loading model: {e}")
         raise e
 
 model = load_model()
@@ -407,11 +517,13 @@ model = load_model()
 @st.cache_resource
 def find_helmet_classes():
     sample_img = np.zeros((640, 640, 3), dtype=np.uint8)
-    results = model(sample_img)
-    class_names = list(results.names.values())
+    results = model.predict(sample_img)[0]  # Get DataFrame results
+    class_names = list(model.get_names().values())
     
     helmet_classes = [cls for cls in class_names if any(k in cls.lower() for k in HELMET_KEYWORDS)]
     return helmet_classes
+
+
 
 HELMET_CLASSES = find_helmet_classes()
 
@@ -419,47 +531,40 @@ HELMET_CLASSES = find_helmet_classes()
 # DETECTION & ALERT LOGIC
 # ---------------------------
 def draw_restricted_zone(frame, coords=(100, 100, 500, 400)):
-    import cv2  # 💥 Delay cv2 import here
     x1, y1, x2, y2 = coords
     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
     cv2.putText(frame, "Restricted Zone", (x1, y1 - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
 def detect_and_alert(frame, confidence_thresh):
-    import cv2  # 💥 Delay cv2 import here
-    results = model(frame)
-    detections = results.pandas().xyxy[0]
-    frame = np.squeeze(results.render())
+    detections, rendered_frame = model.predict(frame)
+    
+    # Log a violation for every 'NO-Hardhat' or 'NO-Mask' detected above the threshold
+    for _, row in detections.iterrows():
+        if row['confidence'] > confidence_thresh:
+            if row['name'] == "NO-Hardhat":
+                log_violation("No Hardhat Detected", rendered_frame)
+                st.warning("Violation Detected!")
+                draw_restricted_zone(rendered_frame)
+                return rendered_frame, True
+            if row['name'] == "NO-Mask":
+                log_violation("No Mask Detected", rendered_frame)
+                st.warning("Violation Detected!")
+                draw_restricted_zone(rendered_frame)
+                return rendered_frame, True
 
-    persons = detections[detections['name'] == 'person']
-    helmets = detections[detections['name'].isin(HELMET_CLASSES)] if HELMET_CLASSES else pd.DataFrame()
+        # Check for restricted zone violations
+        if row['name'] == 'person':
+            person_box = [row['xmin'], row['ymin'], row['xmax'], row['ymax']]
+            x_center = int((person_box[0] + person_box[2]) / 2)
+            y_center = int((person_box[1] + person_box[3]) / 2)
+            if 100 < x_center < 500 and 100 < y_center < 400:
+                log_violation("Person entered Restricted Zone", rendered_frame)
+                draw_restricted_zone(rendered_frame)
+                return rendered_frame, True
 
-    alert_triggered = False
-
-    for _, person in persons.iterrows():
-        person_box = [person['xmin'], person['ymin'], person['xmax'], person['ymax']]
-        helmet_found = False
-        for _, helmet in helmets.iterrows():
-            if (
-                helmet['xmin'] > person_box[0] and
-                helmet['ymin'] > person_box[1] and
-                helmet['xmax'] < person_box[2] and
-                helmet['ymax'] < person_box[3]
-            ):
-                helmet_found = True
-                break
-        if not helmet_found:
-            alert_triggered = True
-            log_violation("No Helmet Detected", frame)
-
-        x_center = int((person_box[0] + person_box[2]) / 2)
-        y_center = int((person_box[1] + person_box[3]) / 2)
-        if 100 < x_center < 500 and 100 < y_center < 400:
-            alert_triggered = True
-            log_violation("Person entered Restricted Zone", frame)
-
-    draw_restricted_zone(frame)
-    return frame, alert_triggered
+    draw_restricted_zone(rendered_frame)
+    return rendered_frame, False
 
 # ---------------------------
 # AUTHENTICATION
@@ -475,16 +580,16 @@ if not st.session_state.logged_in:
     </div>
     """, unsafe_allow_html=True)
     
-    tabs = st.tabs(["🔐 Login", "📝 Sign Up"])
+    tabs = st.tabs(["Login", "Sign Up"])
     
     with tabs[0]:
         st.markdown('<div class="login-container">', unsafe_allow_html=True)
         st.markdown('<h2 style="text-align: center; margin-bottom: 30px;">🔐 Admin Login</h2>', unsafe_allow_html=True)
-        username = st.text_input("👤 Username", placeholder="Enter your username")
-        password = st.text_input("🔒 Password", type="password", placeholder="Enter your password")
+        username = st.text_input("Username", placeholder="Enter your username")
+        password = st.text_input("Password", type="password", placeholder="Enter your password")
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if st.button("🚀 Login", use_container_width=True):
+            if st.button("Login", use_container_width=True):
                 if check_user(username, password):
                     st.session_state.logged_in = True
                     st.success("✅ Login successful!")
@@ -496,16 +601,25 @@ if not st.session_state.logged_in:
     with tabs[1]:
         st.markdown('<div class="login-container">', unsafe_allow_html=True)
         st.markdown('<h2 style="text-align: center; margin-bottom: 30px;">📝 Create Admin Account</h2>', unsafe_allow_html=True)
-        new_user = st.text_input("👤 New Username", placeholder="Choose a username")
-        new_pass = st.text_input("🔒 New Password", type="password", placeholder="Choose a password")
+        new_user = st.text_input("New Username", placeholder="Choose a username")
+        new_pass = st.text_input("New Password", type="password", placeholder="Choose a password")
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if st.button("✨ Sign Up", use_container_width=True):
+            if st.button("Sign Up", use_container_width=True):
                 if new_user and new_pass:
-                    add_user(new_user, new_pass)
-                    st.success("✅ Account created! You can log in now.")
+                    # Show password requirements
+                    st.info("""
+                    Password requirements:
+                    - At least 8 characters long
+                    - At least one uppercase letter
+                    - At least one lowercase letter
+                    - At least one number
+                    """)
+                    if add_user(new_user, new_pass):
+                        time.sleep(2)  # Give user time to read the success message
+                        st.rerun()  # Refresh to login tab
                 else:
-                    st.warning("⚠️ Please enter both username and password.")
+                    st.warning("⚠️ Please enter username and password.")
         st.markdown('</div>', unsafe_allow_html=True)
 
 else:
@@ -519,26 +633,52 @@ else:
     </div>
     """, unsafe_allow_html=True)
     
-    # Sidebar with logout and settings
+    # Sidebar with settings and account
     with st.sidebar:
-        st.markdown('<div style="background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 20px; margin-bottom: 20px;">', unsafe_allow_html=True)
-        st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">⚙️ Settings</h3>', unsafe_allow_html=True)
-        confidence_thresh = st.slider("🎯 Confidence Threshold", 0.0, 1.0, 0.5, 0.05)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown('<div style="background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 20px;">', unsafe_allow_html=True)
-        st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">👤 Account</h3>', unsafe_allow_html=True)
-        if st.button("🔓 Logout", use_container_width=True):
-            st.session_state.update({'logged_in': False})
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("""
+<div style="background: rgba(255, 255, 255, 0.05); 
+            border-radius: 15px; 
+            padding: 1.5rem; 
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);">
+    <h3 style="color: #ffffff; 
+               margin-bottom: 1rem;
+               font-size: 1.3rem;
+               letter-spacing: 0.5px;">Settings</h3>
+    <div style="margin-bottom: 1rem;">
+        <p style="color: #b0b0b0; 
+                  margin-bottom: 0.5rem;
+                  font-size: 0.9rem;">Adjust detection sensitivity</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+    
+    confidence_thresh = st.slider("Confidence Threshold", 0.0, 1.0, 0.5, 0.05)
+    
+    st.markdown("""
+<div style="background: rgba(255, 255, 255, 0.05); 
+            border-radius: 15px; 
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);">
+    <h3 style="color: #ffffff; 
+               margin-bottom: 1rem;
+               font-size: 1.3rem;
+               letter-spacing: 0.5px;">Account</h3>
+</div>
+""", unsafe_allow_html=True)
+    
+    if st.button("Logout", use_container_width=True):
+        st.session_state.update({'logged_in': False})
+        st.rerun()
 
     # Main content tabs
     detection_tab, logs_tab, analytics_tab, admin_tab = st.tabs([
-        "🎥 Live Detection",
-        "📂 Violation Logs", 
-        "📊 Analytics",
-        "👥 Admin Panel"
+        "Live Detection",
+        "Violation Logs", 
+        "Analytics",
+        "Admin Panel"
     ])
 
     # ---- Live Detection ----
@@ -548,23 +688,20 @@ else:
         
         detect_mode = st.radio(
             "Select Detection Mode:",
-            ["📡 Webcam", "📸 Image Upload", "🎥 Video Upload"],
+            ["Webcam", "Image Upload", "Video Upload"],
             horizontal=True
         )
         st.markdown('</div>', unsafe_allow_html=True)
 
-        if detect_mode == "📡 Webcam":
+        if detect_mode == "Webcam":
             st.markdown('<div class="webcam-container">', unsafe_allow_html=True)
             st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">📡 Real-time Webcam Detection</h3>', unsafe_allow_html=True)
-
-            from streamlit_webrtc import webrtc_streamer
-            import av  # Required for streamlit-webrtc
 
             def video_frame_callback(frame):
                 img = frame.to_ndarray(format="bgr24")
                 processed_img, alert = detect_and_alert(img, confidence_thresh)
                 if alert:
-                    st.warning("🚨 Violation Detected!")
+                    st.warning("Violation Detected!")
                 return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
 
             webrtc_streamer(
@@ -576,7 +713,7 @@ else:
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-        elif detect_mode == "📸 Image Upload":
+        elif detect_mode == "Image Upload":
             st.markdown('<div class="upload-container">', unsafe_allow_html=True)
             st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">📸 Image Analysis</h3>', unsafe_allow_html=True)
             
@@ -592,16 +729,16 @@ else:
                     st.image(img, caption="Uploaded Image", use_container_width=True)
                 with col2:
                     st.markdown('<h4 style="color: #ffffff; margin-bottom: 10px;">🔍 Detection Result</h4>', unsafe_allow_html=True)
-                    if st.button("🔍 Analyze Image", use_container_width=True):
+                    if st.button("Analyze Image", use_container_width=True):
                         processed_img, alert = detect_and_alert(img_array, confidence_thresh)
                         st.image(processed_img, caption="Detection Result", use_container_width=True)
                         if alert:
-                            st.warning("🚨 Violation Detected!")
+                            st.warning("Violation Detected!")
                         else:
-                            st.success("✅ No violations detected!")
+                            st.success("No violations detected!")
             st.markdown('</div>', unsafe_allow_html=True)
 
-        elif detect_mode == "🎥 Video Upload":
+        elif detect_mode == "Video Upload":
             st.markdown('<div class="upload-container">', unsafe_allow_html=True)
             st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">🎥 Video Analysis</h3>', unsafe_allow_html=True)
             
@@ -612,7 +749,7 @@ else:
                 tfile.write(vid_file.read())
                 tfile.close()
                 
-                if st.button("🎬 Process Video", use_container_width=True):
+                if st.button("Process Video", use_container_width=True):
                     st.markdown('<div style="background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 20px; margin-top: 20px;">', unsafe_allow_html=True)
                     st.markdown('<h4 style="color: #ffffff; margin-bottom: 15px;">🎬 Processing Video</h4>', unsafe_allow_html=True)
                     import cv2  # 💥 Delay cv2 import
@@ -630,11 +767,11 @@ else:
                         processed_frame, alert = detect_and_alert(frame, confidence_thresh)
                         stframe.image(processed_frame, channels="RGB", use_container_width=True)
                         if alert:
-                            st.warning("🚨 Violation Detected!")
+                            st.warning("Violation Detected!")
                         count += 1
                         progress_bar.progress(count / total_frames)
                     cap.release()
-                    st.success("✅ Video Processing Complete!")
+                    st.success("Video Processing Complete!")
                     st.markdown('</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -648,36 +785,40 @@ else:
         conn.close()
         
         if df.empty:
-            st.info("📭 No violations logged yet. Start detection to log violations.")
+            st.info("No violations logged yet. Start detection to log violations.")
         else:
-            # Summary metrics
+            # Update the metric cards in the logs tab
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.markdown(f"""
                 <div class="metric-card">
-                    <h3 style="color: #667eea; margin-bottom: 5px;">📊 Total Violations</h3>
-                    <h2 style="color: #ffffff; font-size: 2rem;">{len(df)}</h2>
+                    <h3 style="color: #667eea; margin-bottom: 10px; font-size: 1.1rem;">Total Violations</h3>
+                    <h2 style="color: #ffffff; font-size: 2.5rem; margin-bottom: 5px;">{len(df)}</h2>
+                    <p style="color: #b0b0b0; font-size: 0.9rem;">All time</p>
                 </div>
                 """, unsafe_allow_html=True)
             with col2:
                 st.markdown(f"""
                 <div class="metric-card">
-                    <h3 style="color: #667eea; margin-bottom: 5px;">📅 Today</h3>
-                    <h2 style="color: #ffffff; font-size: 2rem;">{len(df[df['timestamp'].str.startswith(datetime.now().strftime('%Y-%m-%d'))])}</h2>
+                    <h3 style="color: #667eea; margin-bottom: 10px; font-size: 1.1rem;">Today's Alerts</h3>
+                    <h2 style="color: #ffffff; font-size: 2.5rem; margin-bottom: 5px;">{len(df[df['timestamp'].str.startswith(datetime.now().strftime('%Y-%m-%d'))])}</h2>
+                    <p style="color: #b0b0b0; font-size: 0.9rem;">Last 24 hours</p>
                 </div>
                 """, unsafe_allow_html=True)
             with col3:
                 st.markdown(f"""
                 <div class="metric-card">
-                    <h3 style="color: #667eea; margin-bottom: 5px;">🚨 No Helmet</h3>
-                    <h2 style="color: #ffffff; font-size: 2rem;">{len(df[df['reason'] == 'No Helmet Detected'])}</h2>
+                    <h3 style="color: #667eea; margin-bottom: 10px; font-size: 1.1rem;">Safety Gear Violations</h3>
+                    <h2 style="color: #ffffff; font-size: 2.5rem; margin-bottom: 5px;">{len(df[df['reason'] == 'No Hardhat Detected'])}</h2>
+                    <p style="color: #b0b0b0; font-size: 0.9rem;">Missing equipment</p>
                 </div>
                 """, unsafe_allow_html=True)
             with col4:
                 st.markdown(f"""
                 <div class="metric-card">
-                    <h3 style="color: #667eea; margin-bottom: 5px;">🚫 Restricted Zone</h3>
-                    <h2 style="color: #ffffff; font-size: 2rem;">{len(df[df['reason'] == 'Person entered Restricted Zone'])}</h2>
+                    <h3 style="color: #667eea; margin-bottom: 10px; font-size: 1.1rem;">Zone Violations</h3>
+                    <h2 style="color: #ffffff; font-size: 2.5rem; margin-bottom: 5px;">{len(df[df['reason'] == 'Person entered Restricted Zone'])}</h2>
+                    <p style="color: #b0b0b0; font-size: 0.9rem;">Restricted areas</p>
                 </div>
                 """, unsafe_allow_html=True)
             # Data table
@@ -696,31 +837,31 @@ else:
             st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">📥 Export Reports</h3>', unsafe_allow_html=True)
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("⬇️ Download CSV", use_container_width=True):
+                if st.button("Download CSV", use_container_width=True):
                     csv_data = df.to_csv(index=False).encode('utf-8')
                     st.download_button(
-                        label="📥 Download CSV Report",
+                        label="Download CSV Report",
                         data=csv_data,
                         file_name='violations_report.csv',
                         mime='text/csv',
                         use_container_width=True
                     )
-                    st.success("✅ CSV exported successfully!")
+                    st.success("CSV exported successfully!")
             with col2:
-                if st.button("⬇️ Download PDF", use_container_width=True):
+                if st.button("Download PDF", use_container_width=True):
                     pdf = FPDF()
                     pdf.add_page()
                     pdf.set_font("Arial", size=12)
-                    pdf.cell(200, 10, txt="Violation Report", ln=True, align='C')
+                    pdf.cell(200, 10, "Violation Report", ln=True, align='C')
                     for idx, row in df.iterrows():
-                        pdf.cell(200, 10, txt=f"{row['timestamp']} - {row['reason']}", ln=True)
+                        pdf.cell(200, 10, f"{row['timestamp']} - {row['reason']}", ln=True)
                     temp_pdf_path = "temp_report.pdf"
                     pdf.output(temp_pdf_path)
                     with open(temp_pdf_path, "rb") as pdf_file:
                         pdf_data = pdf_file.read()
                     os.remove(temp_pdf_path)
                     st.download_button(
-                        label="📥 Download PDF Report",
+                        label="Download PDF Report",
                         data=pdf_data,
                         file_name="violations_report.pdf",
                         mime="application/pdf",
@@ -730,61 +871,66 @@ else:
     # ---- Analytics ----
     with analytics_tab:
         st.markdown('<div class="analytics-container">', unsafe_allow_html=True)
-        st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">📊 Violation Analytics</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">Violation Analytics</h2>', unsafe_allow_html=True)
+        
         conn = sqlite3.connect(DB_NAME)
         df = pd.read_sql_query("SELECT * FROM violations", conn)
         conn.close()
+        
         if not df.empty:
             df['timestamp'] = pd.to_datetime(df['timestamp'], format="%Y-%m-%d_%H-%M-%S", errors='coerce')
             df = df.dropna(subset=['timestamp'])
             df['date'] = df['timestamp'].dt.date
             daily_counts = df.groupby('date').size().reset_index(name='count').sort_values('date')
+            
             col1, col2 = st.columns(2)
             with col1:
-                st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">📈 Daily Violation Trend</h3>', unsafe_allow_html=True)
+                st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">Daily Violation Trend</h3>', unsafe_allow_html=True)
                 trend_chart = px.line(
                     daily_counts, 
                     x='date', 
                     y='count', 
-                    markers=True, 
-                    title="Daily Violation Trend",
+                    markers=True,
                     template="plotly_dark"
                 )
-                trend_chart.update_layout(
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='white')
+                trend_chart.update_layout(**create_chart_config()['layout'])
+                trend_chart.update_traces(
+                    line_color='#667eea',
+                    marker=dict(size=8, color='#764ba2')
                 )
                 st.plotly_chart(trend_chart, use_container_width=True)
+                
             with col2:
-                st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">🍩 Violation Type Distribution</h3>', unsafe_allow_html=True)
+                st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">Violation Type Distribution</h3>', unsafe_allow_html=True)
                 pie_chart = px.pie(
-                    df, 
-                    names='reason', 
-                    title="Violation Type Distribution",
-                    template="plotly_dark"
+                    df,
+                    names='reason',
+                    template="plotly_dark",
+                    color_discrete_sequence=['#667eea', '#764ba2', '#a78bfa']
                 )
-                pie_chart.update_layout(
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='white')
+                pie_chart.update_layout(**create_chart_config()['layout'])
+                pie_chart.update_traces(
+                    textfont_color='white',
+                    hovertemplate='<b>%{label}</b><br>Count: %{value}<extra></extra>'
                 )
                 st.plotly_chart(pie_chart, use_container_width=True)
-            st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">📊 Violation Type Counts</h3>', unsafe_allow_html=True)
+                
+            st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">Violation Type Counts</h3>', unsafe_allow_html=True)
             bar_chart = px.bar(
-                df, 
-                x='reason', 
-                title="Violation Type Counts",
-                template="plotly_dark"
+                df,
+                x='reason',
+                template="plotly_dark",
+                color_discrete_sequence=['#667eea']
             )
-            bar_chart.update_layout(
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='white')
+            bar_chart.update_layout(**create_chart_config()['layout'])
+            bar_chart.update_traces(
+                marker_line_color='rgba(255,255,255,0.2)',
+                marker_line_width=1,
+                hovertemplate='<b>%{x}</b><br>Count: %{y}<extra></extra>'
             )
             st.plotly_chart(bar_chart, use_container_width=True)
         else:
-            st.info("📊 No data yet. Start detection to generate analytics.")
+            st.info("No data yet. Start detection to generate analytics.")
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ---- Admin Panel ----
@@ -801,8 +947,8 @@ else:
         with col1:
             st.markdown("""
             <div class="metric-card">
-                <h3 style="color: #667eea; margin-bottom: 5px;">🪖 Model Status</h3>
-                <h2 style="color: #ffffff; font-size: 1.5rem;">✅ Loaded</h2>
+                <h3 style="color: #667eea; margin-bottom: 5px;">Model Status</h3>
+                <h2 style="color: #ffffff; font-size: 1.5rem;">Active</h2>
             </div>
             """, unsafe_allow_html=True)
         with col2:
@@ -815,21 +961,22 @@ else:
         st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">📁 File Management</h3>', unsafe_allow_html=True)
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🗑️ Clear Violation Logs", use_container_width=True):
+            if st.button("Clear Violation Logs", use_container_width=True):
                 conn = sqlite3.connect(DB_NAME)
                 c = conn.cursor()
                 c.execute("DELETE FROM violations")
                 conn.commit()
                 conn.close()
-                st.success("✅ Violation logs cleared!")
+                st.success("Violation logs cleared!")
                 st.rerun()
         with col2:
-            if st.button("📁 Open Violations Folder", use_container_width=True):
+            if st.button("Open Violations Folder", use_container_width=True):
                 os.system(f"open {FRAME_SAVE_DIR}")
-                st.success("✅ Opened violations folder!")
+                st.success("Opened violations folder!")
         st.markdown('</div>', unsafe_allow_html=True)
 
-init_db()
+
+
 
 
 
