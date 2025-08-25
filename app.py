@@ -1,3 +1,5 @@
+
+
 import os
 import streamlit as st
 import numpy as np
@@ -20,7 +22,7 @@ import av
 # ---------------------------
 st.set_page_config(
     page_title="AI-Powered Safety Gear Detection for Industrial Monitoring",
- 
+
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -29,16 +31,16 @@ st.set_page_config(
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    
+
     .main {
         background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
         color: #ffffff;
     }
-    
+
     .stApp {
         background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
     }
-    
+
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background: rgba(255, 255, 255, 0.05);
@@ -47,7 +49,7 @@ st.markdown("""
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.1);
     }
-    
+
     .stTabs [data-baseweb="tab"] {
         background: transparent;
         border-radius: 8px;
@@ -56,13 +58,13 @@ st.markdown("""
         padding: 8px 16px;
         transition: all 0.3s ease;
     }
-    
+
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
     }
-    
+
     .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -74,12 +76,12 @@ st.markdown("""
         transition: all 0.3s ease;
         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
     }
-    
+
     .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
     }
-    
+
     .stTextInput > div > div > input {
         background: rgba(255, 255, 255, 0.1);
         border: 1px solid rgba(255, 255, 255, 0.2);
@@ -88,16 +90,16 @@ st.markdown("""
         padding: 12px 16px;
         font-family: 'Inter', sans-serif;
     }
-    
+
     .stTextInput > div > div > input:focus {
         border-color: #667eea;
         box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
     }
-    
+
     .stSlider > div > div > div > div {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
-    
+
     .stRadio > div > div > div > label {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -107,28 +109,28 @@ st.markdown("""
         transition: all 0.3s ease;
         backdrop-filter: blur(10px);
     }
-    
+
     .stRadio > div > div > div > label:hover {
         background: rgba(255, 255, 255, 0.1);
         border-color: #667eea;
     }
-    
+
     .stRadio > div > div > div > label[data-testid="stRadio"] {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-color: #667eea;
     }
-    
+
     .stDataFrame {
         background: rgba(255, 255, 255, 0.05);
         border-radius: 12px;
         border: 1px solid rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(10px);
     }
-    
+
     .stProgress > div > div > div > div {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
-    
+
     .stFileUploader > div > div > div > div {
         background: rgba(255, 255, 255, 0.05);
         border: 2px dashed rgba(255, 255, 255, 0.2);
@@ -137,27 +139,27 @@ st.markdown("""
         text-align: center;
         transition: all 0.3s ease;
     }
-    
+
     .stFileUploader > div > div > div > div:hover {
         border-color: #667eea;
         background: rgba(255, 255, 255, 0.1);
     }
-    
+
     .stSidebar {
         background: rgba(0, 0, 0, 0.3);
         backdrop-filter: blur(20px);
         border-right: 1px solid rgba(255, 255, 255, 0.1);
     }
-    
+
     .stSidebar .sidebar-content {
         background: transparent;
     }
-    
+
     .stMarkdown {
         color: #ffffff;
         font-family: 'Inter', sans-serif;
     }
-    
+
     .stMarkdown h1 {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         -webkit-background-clip: text;
@@ -167,48 +169,48 @@ st.markdown("""
         font-size: 2.5rem;
         margin-bottom: 1rem;
     }
-    
+
     .stMarkdown h2 {
         color: #ffffff;
         font-weight: 600;
         font-size: 1.8rem;
         margin-bottom: 1rem;
     }
-    
+
     .stMarkdown h3 {
         color: #e0e0e0;
         font-weight: 500;
         font-size: 1.3rem;
         margin-bottom: 0.8rem;
     }
-    
+
     .stAlert {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
         backdrop-filter: blur(10px);
     }
-    
+
     .stSuccess {
         background: rgba(76, 175, 80, 0.1);
         border-color: rgba(76, 175, 80, 0.3);
     }
-    
+
     .stError {
         background: rgba(244, 67, 54, 0.1);
         border-color: rgba(244, 67, 54, 0.3);
     }
-    
+
     .stWarning {
         background: rgba(255, 152, 0, 0.1);
         border-color: rgba(255, 152, 0, 0.3);
     }
-    
+
     .stInfo {
         background: rgba(33, 150, 243, 0.1);
         border-color: rgba(33, 150, 243, 0.3);
     }
-    
+
     .metric-card {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -218,12 +220,12 @@ st.markdown("""
         backdrop-filter: blur(10px);
         transition: all 0.3s ease;
     }
-    
+
     .metric-card:hover {
         transform: translateY(-4px);
         box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
     }
-    
+
     .feature-card {
         background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
         border: 1px solid rgba(102, 126, 234, 0.2);
@@ -233,12 +235,12 @@ st.markdown("""
         backdrop-filter: blur(10px);
         transition: all 0.3s ease;
     }
-    
+
     .feature-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
     }
-    
+
     .webcam-container {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -247,7 +249,7 @@ st.markdown("""
         margin: 16px 0;
         backdrop-filter: blur(10px);
     }
-    
+
     .upload-container {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -256,7 +258,7 @@ st.markdown("""
         margin: 16px 0;
         backdrop-filter: blur(10px);
     }
-    
+
     .analytics-container {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -265,7 +267,7 @@ st.markdown("""
         margin: 16px 0;
         backdrop-filter: blur(10px);
     }
-    
+
     .login-container {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -276,29 +278,29 @@ st.markdown("""
         backdrop-filter: blur(20px);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     }
-    
+
     .stPlotlyChart {
         background: rgba(255, 255, 255, 0.05);
         border-radius: 12px;
         padding: 16px;
         border: 1px solid rgba(255, 255, 255, 0.1);
     }
-    
+
     /* Custom scrollbar */
     ::-webkit-scrollbar {
         width: 8px;
     }
-    
+
     ::-webkit-scrollbar-track {
         background: rgba(255, 255, 255, 0.1);
         border-radius: 4px;
     }
-    
+
     ::-webkit-scrollbar-thumb {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-radius: 4px;
     }
-    
+
     ::-webkit-scrollbar-thumb:hover {
         background: linear-gradient(135deg, #5a6fd8 0%, #6a5acd 100%);
     }
@@ -318,15 +320,15 @@ if 'storage_initialized' not in st.session_state:
     # Create unique subdirectories for this session
     session_id = str(hash(datetime.now().isoformat()))
     base_dir = tempfile.gettempdir()
-    
+
     st.session_state.temp_dir = os.path.join(base_dir, f"helmet_detection_{session_id}")
     st.session_state.db_name = os.path.join(st.session_state.temp_dir, 'violations.db')
     st.session_state.frame_dir = os.path.join(st.session_state.temp_dir, 'violations')
-    
+
     # Create necessary directories
     os.makedirs(st.session_state.temp_dir, exist_ok=True)
     os.makedirs(st.session_state.frame_dir, exist_ok=True)
-    
+
     st.session_state.storage_initialized = True
 
 # Use session state variables
@@ -339,10 +341,10 @@ def init_db():
     try:
         # Ensure the directory exists
         os.makedirs(os.path.dirname(DB_NAME), exist_ok=True)
-        
+
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
-        
+
         # Create users table if not exists
         c.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -351,7 +353,7 @@ def init_db():
                 password_hash TEXT NOT NULL
             )
         ''')
-        
+
         # Create violations table if not exists
         c.execute('''
             CREATE TABLE IF NOT EXISTS violations (
@@ -361,12 +363,12 @@ def init_db():
                 frame_path TEXT NOT NULL
             )
         ''')
-        
+
         # Add default admin user if not exists
         try:
             default_username = "admin"
             default_password = "admin123"
-            
+
             # Check if admin user exists
             c.execute("SELECT username FROM users WHERE username = ?", (default_username,))
             if not c.fetchone():
@@ -378,7 +380,7 @@ def init_db():
             pass  # Admin user already exists
         except Exception as e:
             st.error(f"Error creating default admin: {str(e)}")
-        
+
         conn.commit()
         conn.close()
     except Exception as e:
@@ -407,13 +409,13 @@ def add_user(username, password):
     if len(username) < 3:
         st.error("❌ Username must be at least 3 characters long")
         return False
-        
+
     # Validate password
     is_valid, message = validate_password(password)
     if not is_valid:
         st.error(f"❌ {message}")
         return False
-    
+
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     try:
@@ -436,28 +438,79 @@ def check_user(username, password):
     c.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
     result = c.fetchone()
     conn.close()
-    
+
     if result and result[0] == hash_password(password):
         return True
     return False
 
+def sanitize_text_for_pdf(text):
+    """Sanitize text for PDF generation by replacing Unicode characters"""
+    if text is None:
+        return ""
+
+    # Convert to string if not already
+    text = str(text)
+
+    # Replace common Unicode characters with ASCII equivalents
+    replacements = {
+        '\u2022': '-',  # bullet point
+        '\u2013': '-',  # en dash
+        '\u2014': '--', # em dash
+        '\u2018': "'",  # left single quote
+        '\u2019': "'",  # right single quote
+        '\u201c': '"',  # left double quote
+        '\u201d': '"',  # right double quote
+        '\u2026': '...', # ellipsis
+        '\u00a0': ' ',  # non-breaking space
+        '\u00b0': 'deg', # degree symbol
+        '\u2190': '<-', # left arrow
+        '\u2192': '->', # right arrow
+        '\u2191': '^',  # up arrow
+        '\u2193': 'v',  # down arrow
+        '\u2713': 'v',  # check mark
+        '\u2717': 'x',  # cross mark
+        '\u26a0': '!',  # warning sign
+        '\u2705': 'v',  # check mark button
+        '\u274c': 'x',  # cross mark
+        '\u2b05': '<-', # left arrow
+        '\u27a1': '->', # right arrow
+        '\u2b06': '^',  # up arrow
+        '\u2b07': 'v',  # down arrow
+        '\u2139': 'i',  # information
+        '\u2764': '<3', # heart
+        '\ud83d\udcc4': '[DOC]', # document
+        '\ud83d\udcc8': '[CHART]', # chart
+        '\ud83d\udcca': '[BAR]',   # bar chart
+        '\ud83d\udcdd': '[NOTE]',  # memo
+        '\ud83d\uddbc': '[FRAME]', # framed picture
+    }
+
+    # Apply replacements
+    for unicode_char, replacement in replacements.items():
+        text = text.replace(unicode_char, replacement)
+
+    # Remove any remaining non-ASCII characters
+    text = text.encode('ascii', errors='ignore').decode('ascii')
+
+    return text
+
 def log_violation(reason, frame):
     """Log a violation with timestamp and save the frame"""
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    
+
     # Create violations directory if it doesn't exist
     if not os.path.exists(FRAME_SAVE_DIR):
         os.makedirs(FRAME_SAVE_DIR)
-    
+
     # Save the frame
     frame_path = os.path.join(FRAME_SAVE_DIR, f"{timestamp}.jpg")
     cv2.imwrite(frame_path, frame)
-    
+
     # Log to database
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("INSERT INTO violations (timestamp, reason, frame_path) VALUES (?, ?, ?)",
-             (timestamp, reason, frame_path))
+              (timestamp, reason, frame_path))
     conn.commit()
     conn.close()
 
@@ -488,7 +541,7 @@ class ModelWrapper:
         """Run prediction and return results in a consistent format"""
         if not self.model:
             raise ValueError("Model not loaded properly")
-            
+
         results = self.model(frame)
         # Convert YOLOv8 results to pandas DataFrame for consistency
         pred_df = pd.DataFrame([
@@ -531,8 +584,8 @@ def create_chart_config():
 @st.cache_resource
 def load_model():
     try:
-        if os.path.exists('bestnew.pt'):
-            return ModelWrapper('bestnew.pt')
+        if os.path.exists('best.pt'):
+            return ModelWrapper('best.pt')
         raise FileNotFoundError("YOLOv8 model file not found")
     except Exception as e:
         st.error(f"❌ Error loading model: {e}")
@@ -548,7 +601,7 @@ def find_helmet_classes():
     sample_img = np.zeros((640, 640, 3), dtype=np.uint8)
     results = model.predict(sample_img)[0]  # Get DataFrame results
     class_names = list(model.get_names().values())
-    
+
     helmet_classes = [cls for cls in class_names if any(k in cls.lower() for k in HELMET_KEYWORDS)]
     return helmet_classes
 
@@ -567,7 +620,7 @@ def draw_restricted_zone(frame, coords=(100, 100, 500, 400)):
 
 def detect_and_alert(frame, confidence_thresh):
     detections, rendered_frame = model.predict(frame)
-    
+
     # Log a violation for every 'NO-Hardhat' or 'NO-Mask' detected above the threshold
     for _, row in detections.iterrows():
         if row['confidence'] > confidence_thresh:
@@ -610,9 +663,9 @@ if not st.session_state.logged_in:
         <p style="color: #b0b0b0; font-size: 1.2rem; margin-bottom: 40px;">Advanced Safety Monitoring System</p>
     </div>
     """, unsafe_allow_html=True)
-    
+
     tabs = st.tabs(["Login", "Sign Up"])
-    
+
     with tabs[0]:
         st.markdown('<div class="login-container">', unsafe_allow_html=True)
         st.markdown('<h2 style="text-align: center; margin-bottom: 30px;">🔐 Admin Login</h2>', unsafe_allow_html=True)
@@ -663,43 +716,43 @@ else:
         <p style="color: #b0b0b0; font-size: 1.1rem;">Advanced Safety Monitoring & Analytics</p>
     </div>
     """, unsafe_allow_html=True)
-    
+
     # Sidebar with settings and account
     with st.sidebar:
         st.markdown("""
-<div style="background: rgba(255, 255, 255, 0.05); 
-            border-radius: 15px; 
-            padding: 1.5rem; 
+<div style="background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 1.5rem;
             margin-bottom: 2rem;
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);">
-    <h3 style="color: #ffffff; 
+    <h3 style="color: #ffffff;
                margin-bottom: 1rem;
                font-size: 1.3rem;
                letter-spacing: 0.5px;">Settings</h3>
     <div style="margin-bottom: 1rem;">
-        <p style="color: #b0b0b0; 
+        <p style="color: #b0b0b0;
                   margin-bottom: 0.5rem;
                   font-size: 0.9rem;">Adjust detection sensitivity</p>
     </div>
 </div>
 """, unsafe_allow_html=True)
-    
+
     confidence_thresh = st.slider("Confidence Threshold", 0.0, 1.0, 0.5, 0.05)
-    
+
     st.markdown("""
-<div style="background: rgba(255, 255, 255, 0.05); 
-            border-radius: 15px; 
+<div style="background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
             padding: 1.5rem;
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);">
-    <h3 style="color: #ffffff; 
+    <h3 style="color: #ffffff;
                margin-bottom: 1rem;
                font-size: 1.3rem;
                letter-spacing: 0.5px;">Account</h3>
 </div>
 """, unsafe_allow_html=True)
-    
+
     if st.button("Logout", use_container_width=True):
         st.session_state.update({'logged_in': False})
         st.rerun()
@@ -707,7 +760,7 @@ else:
     # Main content tabs
     detection_tab, logs_tab, analytics_tab, admin_tab = st.tabs([
         "Live Detection",
-        "Violation Logs", 
+        "Violation Logs",
         "Analytics",
         "Admin Panel"
     ])
@@ -716,10 +769,10 @@ else:
     with detection_tab:
         st.markdown('<div class="feature-card">', unsafe_allow_html=True)
         st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">🎥 Live Detection Options</h2>', unsafe_allow_html=True)
-        
+
         detect_mode = st.radio(
             "Select Detection Mode:",
-            ["Webcam", "Image Upload", "Video Upload"],
+            ["Webcam", "Single Image Upload", "Batch Image Upload"],
             horizontal=True
         )
         st.markdown('</div>', unsafe_allow_html=True)
@@ -744,16 +797,16 @@ else:
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-        elif detect_mode == "Image Upload":
+        elif detect_mode == "Single Image Upload":
             st.markdown('<div class="upload-container">', unsafe_allow_html=True)
-            st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">📸 Image Analysis</h3>', unsafe_allow_html=True)
-            
+            st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">📸 Single Image Analysis</h3>', unsafe_allow_html=True)
+
             img_file = st.file_uploader("Choose Image", type=['jpg', 'png', 'jpeg'], help="Upload an image to analyze for helmet violations")
-            
+
             if img_file is not None:
                 img = Image.open(img_file)
                 img_array = np.array(img)
-                
+
                 col1, col2 = st.columns(2)
                 with col1:
                     st.markdown('<h4 style="color: #ffffff; margin-bottom: 10px;">📸 Original Image</h4>', unsafe_allow_html=True)
@@ -764,45 +817,80 @@ else:
                         processed_img, alert = detect_and_alert(img_array, confidence_thresh)
                         st.image(processed_img, caption="Detection Result", use_container_width=True)
                         if alert:
-                            st.warning("Violation Detected!")
+                            st.warning("⚠️ Violation Detected!")
                         else:
-                            st.success("No violations detected!")
+                            st.success("✅ No violations detected!")
             st.markdown('</div>', unsafe_allow_html=True)
 
-        elif detect_mode == "Video Upload":
+        elif detect_mode == "Batch Image Upload":
             st.markdown('<div class="upload-container">', unsafe_allow_html=True)
-            st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">🎥 Video Analysis</h3>', unsafe_allow_html=True)
-            
-            vid_file = st.file_uploader("Choose Video", type=['mp4', 'avi', 'mov'], help="Upload a video to analyze for helmet violations")
-            
-            if vid_file is not None:
-                tfile = open("temp_video.mp4", 'wb')
-                tfile.write(vid_file.read())
-                tfile.close()
-                
-                if st.button("Process Video", use_container_width=True):
+            st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">📸 Batch Image Analysis</h3>', unsafe_allow_html=True)
+
+            img_files = st.file_uploader("Choose Images", type=['jpg', 'png', 'jpeg'],
+                                       help="Upload multiple images to analyze for helmet violations",
+                                       accept_multiple_files=True)
+
+            if img_files:
+                st.markdown(f'<p style="color: #b0b0b0;">Selected {len(img_files)} image(s) for processing</p>', unsafe_allow_html=True)
+
+                if st.button("Analyze All Images", use_container_width=True):
                     st.markdown('<div style="background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 20px; margin-top: 20px;">', unsafe_allow_html=True)
-                    st.markdown('<h4 style="color: #ffffff; margin-bottom: 15px;">🎬 Processing Video</h4>', unsafe_allow_html=True)
-                    import cv2  # 💥 Delay cv2 import
-                    cap = cv2.VideoCapture("temp_video.mp4")
-                    stframe = st.empty()
+                    st.markdown('<h4 style="color: #ffffff; margin-bottom: 15px;">🔍 Batch Processing Results</h4>', unsafe_allow_html=True)
+
                     progress_bar = st.progress(0)
-                    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                    count = 0
-                    
-                    while cap.isOpened():
-                        ret, frame = cap.read()
-                        if not ret:
-                            break
-                        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        processed_frame, alert = detect_and_alert(frame, confidence_thresh)
-                        stframe.image(processed_frame, channels="RGB", use_container_width=True)
-                        if alert:
-                            st.warning("Violation Detected!")
-                        count += 1
-                        progress_bar.progress(count / total_frames)
-                    cap.release()
-                    st.success("Video Processing Complete!")
+                    total_violations = 0
+
+                    for i, img_file in enumerate(img_files):
+                        img = Image.open(img_file)
+                        img_array = np.array(img)
+
+                        st.markdown(f'<h5 style="color: #667eea; margin: 20px 0 10px 0;">Image {i+1}: {img_file.name}</h5>', unsafe_allow_html=True)
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown('<h6 style="color: #ffffff; margin-bottom: 10px;">📸 Original</h6>', unsafe_allow_html=True)
+                            st.image(img, caption=f"Original - {img_file.name}", use_container_width=True)
+
+                        with col2:
+                            st.markdown('<h6 style="color: #ffffff; margin-bottom: 10px;">🔍 Detection Result</h6>', unsafe_allow_html=True)
+                            processed_img, alert = detect_and_alert(img_array, confidence_thresh)
+                            st.image(processed_img, caption=f"Analyzed - {img_file.name}", use_container_width=True)
+
+                            if alert:
+                                st.warning(f"⚠️ Violation detected in {img_file.name}")
+                                total_violations += 1
+                            else:
+                                st.success(f"✅ No violations in {img_file.name}")
+
+                        # Update progress
+                        progress_bar.progress((i + 1) / len(img_files))
+
+                        # Add separator except for last image
+                        if i < len(img_files) - 1:
+                            st.markdown('<hr style="border: 1px solid rgba(255,255,255,0.1); margin: 30px 0;">', unsafe_allow_html=True)
+
+                    # Summary
+                    st.markdown('<div style="background: rgba(102, 126, 234, 0.1); border-radius: 12px; padding: 20px; margin-top: 30px; border-left: 4px solid #667eea;">', unsafe_allow_html=True)
+                    # Create variables for conditional styling
+                    status_color = '#ff6b6b' if total_violations > 0 else '#51cf66'
+                    status_icon = '⚠️' if total_violations > 0 else '✅'
+                    status_text = 'Issues Found' if total_violations > 0 else 'All Clear'
+
+                    st.markdown(f'''
+                    <h4 style="color: #667eea; margin-bottom: 15px;">📊 Batch Processing Summary</h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <p style="color: #ffffff; margin: 5px 0;"><strong>Total Images Processed:</strong> {len(img_files)}</p>
+                            <p style="color: #ffffff; margin: 5px 0;"><strong>Violations Detected:</strong> {total_violations}</p>
+                            <p style="color: #ffffff; margin: 5px 0;"><strong>Clean Images:</strong> {len(img_files) - total_violations}</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <p style="color: {status_color}; font-size: 2rem; margin: 0;"><strong>{status_icon}</strong></p>
+                            <p style="color: #b0b0b0; font-size: 0.9rem;">{status_text}</p>
+                        </div>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -810,11 +898,11 @@ else:
     with logs_tab:
         st.markdown('<div class="analytics-container">', unsafe_allow_html=True)
         st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">📂 Violation Logs</h2>', unsafe_allow_html=True)
-        
+
         conn = sqlite3.connect(DB_NAME)
         df = pd.read_sql_query("SELECT * FROM violations", conn)
         conn.close()
-        
+
         if df.empty:
             st.info("No violations logged yet. Start detection to log violations.")
         else:
@@ -866,6 +954,9 @@ else:
                         st.image(row['frame_path'], width=200)
             # Export options
             st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">📥 Export Reports</h3>', unsafe_allow_html=True)
+
+     
+
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("Download CSV", use_container_width=True):
@@ -879,89 +970,350 @@ else:
                     )
                     st.success("CSV exported successfully!")
             with col2:
-                if st.button("Download PDF", use_container_width=True):
+                # st.markdown('<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 15px; margin-bottom: 10px;">', unsafe_allow_html=True)
+                # st.markdown('<h4 style="color: #ffffff; margin-bottom: 10px; text-align: center;">📄 Enhanced PDF Report</h4>', unsafe_allow_html=True)
+                # st.markdown('<p style="color: #ffffff; font-size: 0.9rem; text-align: center; margin-bottom: 15px;">Comprehensive report with violation screenshots, timestamps, and statistical analysis</p>', unsafe_allow_html=True)
+
+                if st.button("Download PDF with Screenshots", use_container_width=True):
                     pdf = FPDF()
                     pdf.add_page()
+                    pdf.set_font("Arial", size=16, style='B')
+                    pdf.cell(200, 15, sanitize_text_for_pdf("SAFETY VIOLATION REPORT"), ln=True, align='C')
                     pdf.set_font("Arial", size=12)
-                    pdf.cell(200, 10, "Violation Report", ln=True, align='C')
+                    pdf.cell(200, 10, sanitize_text_for_pdf(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"), ln=True, align='C')
+                    pdf.ln(10)
+
+                    # Summary Section
+                    pdf.set_font("Arial", size=14, style='B')
+                    pdf.cell(200, 10, sanitize_text_for_pdf("EXECUTIVE SUMMARY"), ln=True)
+                    pdf.set_font("Arial", size=11)
+                    pdf.cell(200, 8, sanitize_text_for_pdf(f"Total Violations: {len(df)}"), ln=True)
+
+                    violation_types = df['reason'].value_counts() if len(df) > 0 else pd.Series()
+                    if len(df) > 0:
+                        # Convert timestamp strings to datetime for PDF report
+                        try:
+                            df_temp = df.copy()
+                            df_temp['timestamp'] = pd.to_datetime(df_temp['timestamp'], format="%Y-%m-%d_%H-%M-%S", errors='coerce')
+                            df_temp = df_temp.dropna(subset=['timestamp'])
+                            if not df_temp.empty:
+                                pdf.cell(200, 8, sanitize_text_for_pdf(f"Report Period: {df_temp['timestamp'].min().strftime('%Y-%m-%d')} to {df_temp['timestamp'].max().strftime('%Y-%m-%d')}"), ln=True)
+                            else:
+                                pdf.cell(200, 8, sanitize_text_for_pdf("Report Period: Unable to parse timestamps"), ln=True)
+                        except:
+                            pdf.cell(200, 8, sanitize_text_for_pdf(f"Report Period: {df['timestamp'].min()} to {df['timestamp'].max()}"), ln=True)
+                        if not violation_types.empty:
+                            pdf.cell(200, 8, sanitize_text_for_pdf(f"Most Common Violation: {violation_types.index[0]} ({violation_types.iloc[0]} cases)"), ln=True)
+                    pdf.ln(10)
+
+                    # Violation Details with Screenshots
+                    pdf.set_font("Arial", size=14, style='B')
+                    pdf.cell(200, 10, sanitize_text_for_pdf("DETAILED VIOLATION LOG"), ln=True)
+                    pdf.set_font("Arial", size=10)
+
                     for idx, row in df.iterrows():
-                        pdf.cell(200, 10, f"{row['timestamp']} - {row['reason']}", ln=True)
-                    temp_pdf_path = "temp_report.pdf"
+                        if pdf.get_y() > 250:  # Check if near end of page
+                            pdf.add_page()
+
+                        pdf.set_font("Arial", size=12, style='B')
+                        pdf.cell(200, 8, sanitize_text_for_pdf(f"Violation #{idx + 1}"), ln=True)
+                        pdf.set_font("Arial", size=10)
+                        pdf.cell(200, 6, sanitize_text_for_pdf(f"Timestamp: {row['timestamp']}"), ln=True)
+                        pdf.cell(200, 6, sanitize_text_for_pdf(f"Type: {row['reason']}"), ln=True)
+
+                        # Add screenshot if available
+                        if os.path.exists(row['frame_path']):
+                            try:
+                                # Resize image to fit PDF
+                                img_width = 80
+                                img_height = 60
+                                pdf.image(row['frame_path'], x=10, y=pdf.get_y(), w=img_width, h=img_height)
+                                pdf.ln(img_height + 5)
+                            except:
+                                pdf.cell(200, 6, sanitize_text_for_pdf("Screenshot: Available but could not be embedded"), ln=True)
+                        else:
+                            pdf.cell(200, 6, sanitize_text_for_pdf("Screenshot: Not available"), ln=True)
+
+                        pdf.cell(200, 6, sanitize_text_for_pdf(f"Evidence Path: {row['frame_path']}"), ln=True)
+                        pdf.ln(5)
+
+                    # Statistics Section
+                    pdf.add_page()
+                    pdf.set_font("Arial", size=14, style='B')
+                    pdf.cell(200, 10, sanitize_text_for_pdf("STATISTICAL ANALYSIS"), ln=True)
+                    pdf.set_font("Arial", size=11)
+
+                    # Violation type breakdown
+                    if not violation_types.empty:
+                        pdf.cell(200, 8, sanitize_text_for_pdf("Violation Type Breakdown:"), ln=True)
+                        for violation_type, count in violation_types.items():
+                            percentage = (count / len(df)) * 100
+                            pdf.cell(200, 6, sanitize_text_for_pdf(f"  - {violation_type}: {count} cases ({percentage:.1f}%)"), ln=True)
+                    else:
+                        pdf.cell(200, 8, sanitize_text_for_pdf("No violations to analyze"), ln=True)
+
+                    pdf.ln(10)
+
+                    # Time-based analysis
+                    if len(df) > 0:
+                        try:
+                            # Convert timestamps for time analysis
+                            df_time = df.copy()
+                            df_time['timestamp'] = pd.to_datetime(df_time['timestamp'], format="%Y-%m-%d_%H-%M-%S", errors='coerce')
+                            df_time = df_time.dropna(subset=['timestamp'])
+
+                            if not df_time.empty:
+                                hourly_stats = df_time.groupby(df_time['timestamp'].dt.hour).size()
+                                if not hourly_stats.empty:
+                                    peak_hour = hourly_stats.idxmax()
+                                    pdf.cell(200, 8, sanitize_text_for_pdf("Time-based Analysis:"), ln=True)
+                                    pdf.cell(200, 6, sanitize_text_for_pdf(f"  - Peak violation hour: {peak_hour}:00"), ln=True)
+                                    pdf.cell(200, 6, sanitize_text_for_pdf(f"  - Violations during peak hour: {hourly_stats.max()}"), ln=True)
+                                else:
+                                    pdf.cell(200, 8, sanitize_text_for_pdf("Time-based Analysis: No hourly data available"), ln=True)
+                            else:
+                                pdf.cell(200, 8, sanitize_text_for_pdf("Time-based Analysis: Unable to parse timestamps"), ln=True)
+                        except Exception as e:
+                            pdf.cell(200, 8, sanitize_text_for_pdf("Time-based Analysis: Data insufficient"), ln=True)
+
+                    # Create temporary file with proper path
+                    temp_pdf_path = os.path.join(tempfile.gettempdir(), f"enhanced_violation_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
                     pdf.output(temp_pdf_path)
+
                     with open(temp_pdf_path, "rb") as pdf_file:
                         pdf_data = pdf_file.read()
-                    os.remove(temp_pdf_path)
+
                     st.download_button(
-                        label="Download PDF Report",
+                        label="Get Enhanced PDF Report with Screenshots",
                         data=pdf_data,
-                        file_name="violations_report.pdf",
+                        file_name=f"violation_report_with_screenshots_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                         mime="application/pdf",
                         use_container_width=True
                     )
 
+                    try:
+                        os.remove(temp_pdf_path)
+                    except:
+                        pass  # File might not exist or be locked
+
+                    st.success("Enhanced PDF report with screenshots generated successfully!")
+                    st.info("This PDF includes violation screenshots, detailed timestamps, statistical analysis, and executive summary.")
+
+                st.markdown('</div>', unsafe_allow_html=True)
+
     # ---- Analytics ----
     with analytics_tab:
         st.markdown('<div class="analytics-container">', unsafe_allow_html=True)
-        st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">Violation Analytics</h2>', unsafe_allow_html=True)
-        
+        st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">📊 Advanced Violation Analytics</h2>', unsafe_allow_html=True)
+
         conn = sqlite3.connect(DB_NAME)
         df = pd.read_sql_query("SELECT * FROM violations", conn)
         conn.close()
-        
+
         if not df.empty:
             df['timestamp'] = pd.to_datetime(df['timestamp'], format="%Y-%m-%d_%H-%M-%S", errors='coerce')
             df = df.dropna(subset=['timestamp'])
             df['date'] = df['timestamp'].dt.date
-            daily_counts = df.groupby('date').size().reset_index(name='count').sort_values('date')
-            
+            df['hour'] = df['timestamp'].dt.hour
+            df['weekday'] = df['timestamp'].dt.day_name()
+            df['month'] = df['timestamp'].dt.month_name()
+
+            # Enhanced Summary Metrics
+            col1, col2, col3, col4, col5 = st.columns(5)
+            total_violations = len(df)
+            today_violations = len(df[df['date'] == pd.Timestamp.now().date()])
+            this_week = len(df[df['timestamp'] >= pd.Timestamp.now() - pd.Timedelta(days=7)])
+            avg_daily = df.groupby('date').size().mean() if len(df.groupby('date')) > 0 else 0
+            most_common_violation = df['reason'].mode().iloc[0] if not df['reason'].mode().empty else "None"
+
+            with col1:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3 style="color: #667eea; margin-bottom: 10px; font-size: 1rem;">Total Violations</h3>
+                    <h2 style="color: #ffffff; font-size: 2rem; margin-bottom: 5px;">{total_violations}</h2>
+                    <p style="color: #b0b0b0; font-size: 0.8rem;">All time</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col2:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3 style="color: #667eea; margin-bottom: 10px; font-size: 1rem;">Today</h3>
+                    <h2 style="color: #ffffff; font-size: 2rem; margin-bottom: 5px;">{today_violations}</h2>
+                    <p style="color: #b0b0b0; font-size: 0.8rem;">Current day</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col3:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3 style="color: #667eea; margin-bottom: 10px; font-size: 1rem;">This Week</h3>
+                    <h2 style="color: #ffffff; font-size: 2rem; margin-bottom: 5px;">{this_week}</h2>
+                    <p style="color: #b0b0b0; font-size: 0.8rem;">Last 7 days</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col4:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3 style="color: #667eea; margin-bottom: 10px; font-size: 1rem;">Daily Average</h3>
+                    <h2 style="color: #ffffff; font-size: 2rem; margin-bottom: 5px;">{avg_daily:.1f}</h2>
+                    <p style="color: #b0b0b0; font-size: 0.8rem;">Per day</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col5:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3 style="color: #667eea; margin-bottom: 10px; font-size: 1rem;">Top Issue</h3>
+                    <h2 style="color: #ffffff; font-size: 1.2rem; margin-bottom: 5px;">{most_common_violation[:15]}{'...' if len(most_common_violation) > 15 else ''}</h2>
+                    <p style="color: #b0b0b0; font-size: 0.8rem;">Most frequent</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # Row 1: Trend and Distribution
             col1, col2 = st.columns(2)
             with col1:
-                st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">Daily Violation Trend</h3>', unsafe_allow_html=True)
+                st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">📈 Daily Violation Trend</h3>', unsafe_allow_html=True)
+                daily_counts = df.groupby('date').size().reset_index(name='count').sort_values('date')
                 trend_chart = px.line(
-                    daily_counts, 
-                    x='date', 
-                    y='count', 
+                    daily_counts,
+                    x='date',
+                    y='count',
                     markers=True,
                     template="plotly_dark"
                 )
-                trend_chart.update_layout(**create_chart_config()['layout'])
                 trend_chart.update_traces(
-                    line_color='#667eea',
+                    line=dict(width=3, color='#667eea'),
                     marker=dict(size=8, color='#764ba2')
                 )
+                trend_chart.update_layout(height=400)
                 st.plotly_chart(trend_chart, use_container_width=True)
-                
+
             with col2:
-                st.markdown('<h3 style="color: #ffffff; margin-bottom: 15px;">Violation Type Distribution</h3>', unsafe_allow_html=True)
+                st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">🎯 Violation Type Distribution</h3>', unsafe_allow_html=True)
                 pie_chart = px.pie(
                     df,
                     names='reason',
                     template="plotly_dark",
-                    color_discrete_sequence=['#667eea', '#764ba2', '#a78bfa']
+                    color_discrete_sequence=['#667eea', '#764ba2', '#ff6b6b', '#51cf66', '#ffd93d', '#6bcf7f']
                 )
-                pie_chart.update_layout(**create_chart_config()['layout'])
                 pie_chart.update_traces(
-                    textfont_color='white',
+                    textposition='inside',
+                    textinfo='percent+label',
                     hovertemplate='<b>%{label}</b><br>Count: %{value}<extra></extra>'
                 )
+                pie_chart.update_layout(height=400)
                 st.plotly_chart(pie_chart, use_container_width=True)
-                
-            st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">Violation Type Counts</h3>', unsafe_allow_html=True)
-            bar_chart = px.bar(
-                df,
-                x='reason',
-                template="plotly_dark",
-                color_discrete_sequence=['#667eea']
-            )
-            bar_chart.update_layout(**create_chart_config()['layout'])
-            bar_chart.update_traces(
-                marker_line_color='rgba(255,255,255,0.2)',
-                marker_line_width=1,
-                hovertemplate='<b>%{x}</b><br>Count: %{y}<extra></extra>'
-            )
-            st.plotly_chart(bar_chart, use_container_width=True)
+
+            # Row 2: Hourly and Weekly Patterns
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">⏰ Hourly Violation Pattern</h3>', unsafe_allow_html=True)
+                hourly_counts = df.groupby('hour').size().reset_index(name='count')
+                hourly_chart = px.bar(
+                    hourly_counts,
+                    x='hour',
+                    y='count',
+                    template="plotly_dark",
+                    color_discrete_sequence=['#667eea']
+                )
+                hourly_chart.update_layout(
+                    xaxis_title="Hour of Day",
+                    yaxis_title="Violations Count",
+                    height=400
+                )
+                st.plotly_chart(hourly_chart, use_container_width=True)
+
+            with col2:
+                st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">📅 Weekly Violation Pattern</h3>', unsafe_allow_html=True)
+                weekday_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                weekday_counts = df.groupby('weekday').size().reindex(weekday_order, fill_value=0).reset_index()
+                weekday_counts.columns = ['weekday', 'count']
+                weekly_chart = px.bar(
+                    weekday_counts,
+                    x='weekday',
+                    y='count',
+                    template="plotly_dark",
+                    color_discrete_sequence=['#764ba2']
+                )
+                weekly_chart.update_layout(
+                    xaxis_title="Day of Week",
+                    yaxis_title="Violations Count",
+                    height=400
+                )
+                weekly_chart.update_xaxes(tickangle=45)
+                st.plotly_chart(weekly_chart, use_container_width=True)
+
+            # Row 3: Monthly and Severity Analysis
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">🗓️ Monthly Trend</h3>', unsafe_allow_html=True)
+                monthly_counts = df.groupby('month').size().reset_index(name='count')
+                monthly_chart = px.line(
+                    monthly_counts,
+                    x='month',
+                    y='count',
+                    markers=True,
+                    template="plotly_dark"
+                )
+                monthly_chart.update_traces(
+                    line=dict(width=3, color='#51cf66'),
+                    marker=dict(size=10, color='#ffd93d')
+                )
+                monthly_chart.update_layout(height=400)
+                monthly_chart.update_xaxes(tickangle=45)
+                st.plotly_chart(monthly_chart, use_container_width=True)
+
+            with col2:
+                st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">📊 Violation Severity Analysis</h3>', unsafe_allow_html=True)
+                violation_counts = df['reason'].value_counts().reset_index()
+                violation_counts.columns = ['reason', 'count']
+                severity_chart = px.bar(
+                    violation_counts,
+                    x='count',
+                    y='reason',
+                    orientation='h',
+                    template="plotly_dark",
+                    color_discrete_sequence=['#ff6b6b']
+                )
+                severity_chart.update_layout(
+                    xaxis_title="Number of Violations",
+                    yaxis_title="Violation Type",
+                    height=400
+                )
+                st.plotly_chart(severity_chart, use_container_width=True)
+
+            # Additional Insights
+            st.markdown('<h3 style="color: #ffffff; margin: 30px 0 15px 0;">🔍 Key Insights</h3>', unsafe_allow_html=True)
+
+            insights_col1, insights_col2 = st.columns(2)
+            with insights_col1:
+                peak_hour = df.groupby('hour').size().idxmax() if not df.empty else 0
+                peak_day = df.groupby('weekday').size().idxmax() if not df.empty else "N/A"
+                st.markdown(f"""
+                <div style="background: rgba(102, 126, 234, 0.1); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                    <h4 style="color: #667eea; margin-bottom: 15px;">⏰ Peak Activity Times</h4>
+                    <p style="color: #ffffff; margin: 8px 0;">• Peak Hour: <strong>{peak_hour}:00</strong></p>
+                    <p style="color: #ffffff; margin: 8px 0;">• Peak Day: <strong>{peak_day}</strong></p>
+                    <p style="color: #ffffff; margin: 8px 0;">• Most violations occur during <strong>{peak_hour}:00-{peak_hour+1}:00</strong></p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with insights_col2:
+                safety_score = max(0, 100 - (total_violations * 2)) if total_violations < 50 else 0
+                risk_level = "Low" if safety_score > 70 else "Medium" if safety_score > 40 else "High"
+                risk_color = "#51cf66" if risk_level == "Low" else "#ffd93d" if risk_level == "Medium" else "#ff6b6b"
+                st.markdown(f"""
+                <div style="background: rgba(255, 107, 107, 0.1); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                    <h4 style="color: #ff6b6b; margin-bottom: 15px;">⚠️ Safety Assessment</h4>
+                    <p style="color: #ffffff; margin: 8px 0;">• Safety Score: <strong style="color: {risk_color};">{safety_score}/100</strong></p>
+                    <p style="color: #ffffff; margin: 8px 0;">• Risk Level: <strong style="color: {risk_color};">{risk_level}</strong></p>
+                    <p style="color: #ffffff; margin: 8px 0;">• Total Issues: <strong>{total_violations}</strong></p>
+                </div>
+                """, unsafe_allow_html=True)
         else:
-            st.info("No data yet. Start detection to generate analytics.")
+            st.info("No data available for analytics. Start detection to generate comprehensive analytics.")
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ---- Admin Panel ----
@@ -1006,9 +1358,7 @@ else:
                 st.success("Opened violations folder!")
         st.markdown('</div>', unsafe_allow_html=True)
 
-#pull 
-
-
+#pull
 
 
 
