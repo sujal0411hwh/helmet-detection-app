@@ -768,7 +768,7 @@ else:
     # ---- Live Detection ----
     with detection_tab:
         st.markdown('<div class="feature-card">', unsafe_allow_html=True)
-        st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">🎥 Live Detection Options</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 style="color: #ffffff; margin-bottom: 20px;">🎥 Detection Options</h2>', unsafe_allow_html=True)
 
         detect_mode = st.radio(
             "Select Detection Mode:",
